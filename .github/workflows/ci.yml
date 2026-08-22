@@ -30,6 +30,18 @@ jobs:
       - name: Test
         run: npm test
 
+      # gate.yml and the docs hardcode an owner, because a reusable workflow
+      # cannot interpolate its own repository into a `uses:` reference. Catch a
+      # release that still carries the placeholder.
+      - name: Check the owner placeholder has been replaced
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          if grep -rn 'your-org/stack-gate' \
+              .github/workflows/gate.yml README.md GUIDE.md; then
+            echo "::error::Replace 'your-org' with this repository's owner before tagging a release."
+            exit 1
+          fi
+
       # The actions run from committed bundles, so a stale dist/ means the
       # published action does not match the source it was reviewed as.
       - name: Verify committed bundles are current
