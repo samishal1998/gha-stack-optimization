@@ -67,7 +67,11 @@ async function main(): Promise<void> {
   core.setOutput('affected-count', String(plan.length));
   core.setOutput('check-name', config.checkName);
 
-  core.info(`Trigger: ${trigger}. Plan (${plan.length} check${plan.length === 1 ? '' : 's'}):`);
+  const runId = optionalString('run-id');
+  core.info(
+    `Trigger: ${trigger}${runId ? ` (CI run ${runId})` : ''}. ` +
+      `Plan (${plan.length} check${plan.length === 1 ? '' : 's'}):`,
+  );
   for (const entry of plan) {
     core.info(
       `  #${entry.pr} ${entry.sha.slice(0, 7)} -> ${entry.status}` +

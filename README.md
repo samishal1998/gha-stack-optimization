@@ -153,9 +153,11 @@ permissions:
   contents: read
 
 concurrency:
-  # Serialise per branch so two gate runs never half-write the same checks.
-  group: stack-gate-${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref }}
+  # Serialise every gate run in the repository. See the note below — both parts
+  # of this matter.
+  group: stack-gate
   cancel-in-progress: false # a cancelled gate leaves checks half-written
+  queue: max # without this, queued gate runs are silently dropped
 
 jobs:
   gate:
@@ -184,6 +186,22 @@ with that token. **This gate never checks out anything** — see
 One consequence worth knowing: `pull_request_target` always runs the workflow
 file from your default branch, so changes to this file only take effect once
 merged.
+
+**Why the concurrency block is repo-wide, and why `queue: max`.** Two gate runs
+touching the same stack must not interleave — one writing #6's fresh verdict
+while another writes #4's stale one produces exactly the contradiction the check
+exists to prevent. The natural key is the stack id, but concurrency groups are
+evaluated before any step runs, and no expression available at trigger time
+identifies the stack: `workflow_run` carries only the head branch, and a stacked
+PR's `base.ref` is its parent's branch rather than the stack's target. So the
+group is the whole repository. Gate runs take seconds and never run tests, so
+this costs very little.
+
+`queue: max` is not optional. By default GitHub allows **one** pending run per
+concurrency group and cancels any earlier pending one — so under load, gate runs
+would be dropped, and a dropped gate run is a verdict that never gets written.
+`queue: max` queues up to 100 in FIFO order instead. (It cannot be combined with
+`cancel-in-progress: true`, which you do not want here anyway.)
 
 ### 3. Make `stack-gate` the required check
 
@@ -375,6 +393,11 @@ reachable from fork PRs via `workflow_run`. Therefore:
 - Promoting a PR to checkpoint **temporarily blocks its segment** until that PR
   runs real CI. This is deliberate — the alternative is honouring a verdict it
   never earned — but it is a merge block, so promote before you need to merge.
+- With more than 100 gate runs pending at once, GitHub drops the overflow and
+  those verdicts are not written. Any later event on an affected PR reconciles
+  it, but the check can sit stale until then. If you regularly generate that
+  much PR traffic, split the gate per target branch and accept the narrower
+  serialisation.
 - `stack-gate` never restacks or manages branches. `gh stack` owns that.
 - It never runs tests. It decides _whether_ CI should run and _what verdict to
   report_.

@@ -122,6 +122,7 @@ export interface PlanEntry {
 }
 
 export type PlanReason =
+  | 'seeded'
   | 'not-in-stack-own-ci'
   | 'authority-own-ci'
   | 'authority-republish'
