@@ -1,0 +1,36 @@
+name: 'stack-gate: propagate'
+description: 'Execute a verdict plan, writing the gate check across the affected PRs.'
+author: 'stack-gate'
+
+inputs:
+  token:
+    description: 'Token used for API calls. Needs `checks: write` and `pull-requests: read`.'
+    required: false
+    default: ${{ github.token }}
+  plan:
+    description: 'A plan JSON from `stack-gate/verdict`.'
+    required: true
+  check-name:
+    description: 'Gate check run name.'
+    required: false
+    default: 'stack-gate'
+  dry-run:
+    description: 'Log what would be written without writing it.'
+    required: false
+    default: 'false'
+  max-concurrency:
+    description: 'Maximum concurrent check-run writes.'
+    required: false
+    default: '4'
+
+outputs:
+  posted:
+    description: 'Number of check runs written.'
+  skipped-stale:
+    description: 'Number of PRs skipped because their head SHA moved mid-flight.'
+  results:
+    description: 'JSON array of per-entry results.'
+
+runs:
+  using: node24
+  main: dist/index.js

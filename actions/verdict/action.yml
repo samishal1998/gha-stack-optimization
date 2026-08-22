@@ -1,0 +1,51 @@
+name: 'stack-gate: verdict'
+description: 'Compute which check runs should be posted where. Writes nothing.'
+author: 'stack-gate'
+
+inputs:
+  token:
+    description: 'Token used for API calls. Needs `checks: read`, `pull-requests: read`, `contents: read`.'
+    required: false
+    default: ${{ github.token }}
+  context:
+    description: 'A context JSON from `stack-gate/context`. Resolved internally when omitted.'
+    required: false
+  pr-number:
+    description: 'Pull request to judge. Inferred from the event when omitted.'
+    required: false
+  conclusion:
+    description: 'Conclusion of the CI run that just completed. Omit for a reconcile (no new CI).'
+    required: false
+  run-id:
+    description: 'Id of the CI run that just completed. Informational.'
+    required: false
+  run-url:
+    description: 'html_url of the CI run that just completed. Used as `details_url`.'
+    required: false
+  checkpoint-label:
+    description: 'Label marking a PR as a checkpoint.'
+    required: false
+  check-name:
+    description: 'Gate check run name.'
+    required: false
+  propagate-failures:
+    description: 'Report failures on mirroring PRs, rather than holding them `in_progress`.'
+    required: false
+  config-path:
+    description: 'Path to the repository config file, read from the default branch.'
+    required: false
+    default: '.github/stack-gate.yml'
+
+outputs:
+  plan:
+    description: 'JSON array of `{pr, sha, status, conclusion, reason, title, summary, details_url, provenance}`.'
+  is-authoritative:
+    description: '`true` when the completing run established a verdict of its own.'
+  affected-count:
+    description: 'Number of check runs in the plan.'
+  check-name:
+    description: 'The resolved gate check name, for passing to `propagate`.'
+
+runs:
+  using: node24
+  main: dist/index.js

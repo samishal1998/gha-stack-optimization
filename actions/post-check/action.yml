@@ -1,0 +1,48 @@
+name: 'stack-gate: post-check'
+description: 'Create or update a check run on a commit, idempotently on (name, sha).'
+author: 'stack-gate'
+
+inputs:
+  token:
+    description: 'Token used for API calls. Needs `checks: write`.'
+    required: false
+    default: ${{ github.token }}
+  name:
+    description: 'Check run name. This is the name branch protection requires.'
+    required: false
+    default: 'stack-gate'
+  sha:
+    description: 'Commit to write the check run to.'
+    required: true
+  status:
+    description: '`queued`, `in_progress` or `completed`.'
+    required: false
+    default: 'completed'
+  conclusion:
+    description: '`success`, `failure` or `neutral`. Required when status is `completed`.'
+    required: false
+  title:
+    description: 'Check run output title.'
+    required: false
+  summary:
+    description: 'Check run output summary (markdown).'
+    required: false
+  text:
+    description: 'Extended check run output detail (markdown).'
+    required: false
+  details-url:
+    description: 'Link target for the check run.'
+    required: false
+  external-id:
+    description: 'Correlation id. Overrides the provenance marker stack-gate would otherwise write.'
+    required: false
+
+outputs:
+  check-run-id:
+    description: 'Id of the check run that was created or updated.'
+  created:
+    description: '`false` when an existing check run was updated instead of created.'
+
+runs:
+  using: node24
+  main: dist/index.js

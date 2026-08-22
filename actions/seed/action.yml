@@ -1,0 +1,35 @@
+name: 'stack-gate: seed'
+description: 'Post the gate check immediately so a PR is never blocked by a check that never reported.'
+author: 'stack-gate'
+
+inputs:
+  token:
+    description: 'Token used for API calls. Needs `checks: write`, `pull-requests: read`, `contents: read`.'
+    required: false
+    default: ${{ github.token }}
+  context:
+    description: 'A context JSON from `stack-gate/context`. Resolved internally when omitted.'
+    required: false
+  pr-number:
+    description: 'Pull request to seed. Inferred from the event when omitted.'
+    required: false
+  check-name:
+    description: 'Gate check run name.'
+    required: false
+  checkpoint-label:
+    description: 'Label marking a PR as a checkpoint.'
+    required: false
+  config-path:
+    description: 'Path to the repository config file, read from the default branch.'
+    required: false
+    default: '.github/stack-gate.yml'
+
+outputs:
+  check-run-id:
+    description: 'Id of the seeded check run.'
+  state:
+    description: 'The status the check was left in: `queued`, `in_progress`, `completed` or `skipped`.'
+
+runs:
+  using: node24
+  main: dist/index.js

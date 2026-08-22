@@ -1,0 +1,9 @@
+node_modules/
+coverage/
+*.log
+.DS_Store
+
+# esbuild bundles under actions/*/dist ARE committed (actions run from dist).
+
+# Local Claude Code settings
+.claude/settings.local.json

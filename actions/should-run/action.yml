@@ -1,0 +1,42 @@
+name: 'stack-gate: should-run'
+description: 'Decide whether this PR should run the real CI suite, or skip and mirror its authority.'
+author: 'stack-gate'
+
+inputs:
+  token:
+    description: 'Token used for API calls. Needs `pull-requests: read` and `contents: read`.'
+    required: false
+    default: ${{ github.token }}
+  context:
+    description: 'A context JSON from `stack-gate/context`. Resolved internally when omitted.'
+    required: false
+  pr-number:
+    description: 'Pull request to evaluate. Inferred from the event when omitted.'
+    required: false
+  checkpoint-label:
+    description: 'Label marking a PR as a checkpoint.'
+    required: false
+  force-run-label:
+    description: 'Label that forces a full CI run regardless of stack position.'
+    required: false
+  always-run-paths:
+    description: 'Newline- or comma-separated globs. A PR touching one always runs its own CI.'
+    required: false
+  config-path:
+    description: 'Path to the repository config file, read from the default branch.'
+    required: false
+    default: '.github/stack-gate.yml'
+
+outputs:
+  should-run:
+    description: '`true` when this PR should run the real CI suite.'
+  reason:
+    description: 'One of `not-in-stack`, `is-head`, `is-checkpoint`, `is-authority`, `forced-by-label`, `forced-by-path`, `mirrors-authority`.'
+  authority-pr:
+    description: "PR number whose verdict governs this PR's check."
+  forced:
+    description: '`true` when CI runs because of an escape hatch rather than authority status.'
+
+runs:
+  using: node24
+  main: dist/index.js
