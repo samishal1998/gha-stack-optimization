@@ -27721,13 +27721,13 @@ function computeContext(input) {
 }
 
 // src/resolve.ts
-async function resolve() {
+async function resolve(preresolved) {
   const octokit = makeOctokit();
   const repo = getRepo();
-  const prNumber = await resolveTargetPr(octokit, repo);
+  const prNumber = preresolved?.pr ?? await resolveTargetPr(octokit, repo);
   if (prNumber === null) return null;
   const config = await resolveConfig(octokit, repo);
-  const ctx = await resolveContext(octokit, repo, config, prNumber);
+  const ctx = preresolved ?? await resolveContext(octokit, repo, config, prNumber);
   return { octokit, repo, config, ctx, prNumber };
 }
 async function resolveContext(octokit, repo, config, prNumber) {
@@ -27761,10 +27761,22 @@ async function resolveContext(octokit, repo, config, prNumber) {
     options: { skipDraftHead: config.skipDraftHead }
   });
 }
+function parseContextInput(raw) {
+  if (!raw.trim()) return null;
+  const parsed = JSON.parse(raw);
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error("The `context` input is not a JSON object.");
+  }
+  const ctx = parsed;
+  if (typeof ctx.pr !== "number" || typeof ctx.inStack !== "boolean") {
+    throw new Error("The `context` input is not a stack-gate context object.");
+  }
+  return ctx;
+}
 
 // src/entrypoints/seed.ts
 async function main() {
-  const resolved = await resolve();
+  const resolved = await resolve(parseContextInput(getInput("context")));
   if (!resolved) {
     throw new Error("Could not determine which pull request to seed. Pass the `pr-number` input.");
   }

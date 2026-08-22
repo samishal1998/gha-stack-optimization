@@ -29871,7 +29871,7 @@ function computeVerdict(input) {
   const forcedOwn = trigger === "ci-completed" && forcedRun && own === "failure" ? own : null;
   if (mirrored !== null || forcedOwn !== null) {
     const verdict = mirrored !== null && forcedOwn !== null ? worstOf(mirrored, forcedOwn) : mirrored ?? forcedOwn;
-    const decidedByOwn = forcedOwn !== null && verdict === forcedOwn && forcedOwn !== mirrored;
+    const decidedByOwn = forcedOwn !== null;
     if (verdict === "failure" && !config.propagateFailures && !decidedByOwn) {
       return {
         plan: [

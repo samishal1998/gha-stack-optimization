@@ -27601,13 +27601,13 @@ function computeContext(input) {
 }
 
 // src/resolve.ts
-async function resolve() {
+async function resolve(preresolved) {
   const octokit = makeOctokit();
   const repo = getRepo();
-  const prNumber = await resolveTargetPr(octokit, repo);
+  const prNumber = preresolved?.pr ?? await resolveTargetPr(octokit, repo);
   if (prNumber === null) return null;
   const config = await resolveConfig(octokit, repo);
-  const ctx = await resolveContext(octokit, repo, config, prNumber);
+  const ctx = preresolved ?? await resolveContext(octokit, repo, config, prNumber);
   return { octokit, repo, config, ctx, prNumber };
 }
 async function resolveContext(octokit, repo, config, prNumber) {

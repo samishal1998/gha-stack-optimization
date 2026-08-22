@@ -190,9 +190,10 @@ so you rarely need this on its own. Two cases where you do:
 - You want to make your own decisions based on stack position. For example,
   running an expensive integration suite only on the stack head, or posting a
   comment on the root PR.
-- You are composing `verdict` and `propagate` yourself and want to resolve the
-  topology once, then pass it to both. This saves API calls and guarantees both
-  steps see an identical view of the stack.
+- You are composing the gate yourself and want the resolved topology available
+  to your own steps in between. Pass it to `verdict` so it judges against the
+  same view your steps saw. (`propagate` needs no context of its own — it
+  consumes `verdict`'s plan.)
 
 **Inputs.**
 
@@ -412,12 +413,18 @@ Pass `check-name` from this output into `propagate` rather than setting it twice
 `verdict` reads the config file; `propagate` does not. Threading it through is
 what keeps a config-file `check-name` from being silently ignored.
 
-**The rule that matters most.** A non-authority's own CI conclusion is never used
-as its verdict. This is not a stylistic choice, it is load-bearing: a workflow
-whose jobs were all skipped still concludes `success`. If the gate treated that
-as a pass, every mirrored PR would go green regardless of whether anything was
-ever tested, and the entire mechanism would be decorative. A non-authority's
-verdict always comes from its authority, or it holds.
+**The rule that matters most.** A non-authority's own CI **pass** is never used as
+its verdict. This is not a stylistic choice, it is load-bearing: a workflow whose
+jobs were all skipped still concludes `success`. If the gate treated that as a
+pass, every mirrored PR would go green regardless of whether anything was ever
+tested, and the entire mechanism would be decorative.
+
+So a non-authority's verdict comes from its authority, or it holds — with one
+exception. If an escape hatch made the PR run real CI and **that run failed**, its
+own failure stands, even over a green authority. A skipped workflow never fails,
+so a failure is always real work. See
+[the escape hatches](#always-run-paths-and-force-run-label); the short version is
+that the hatch can make a PR redder than its authority, never greener.
 
 **A cancelled or skipped run is not a verdict.** Nothing was proven, so the check
 holds at `in_progress` rather than reporting anything.
@@ -833,10 +840,14 @@ Set it once in the config file and let it flow:
 check-name: ci-gate
 ```
 
-Then require `ci-gate` in branch protection. The reusable workflow picks it up,
-because `verdict` reads the config and passes the resolved name to `propagate`.
+Then require `ci-gate` in branch protection. The reusable workflow picks this up:
+**leave its `check-name` input unset** and the config file wins. This is why
+`gate.yml`'s inputs deliberately carry no defaults — a default would be forwarded
+as a real value, and an action input always beats the config file, so the gate
+would write `stack-gate` while branch protection waited for `ci-gate`.
 
-If you would rather set it as an input, set it on the reusable workflow:
+If you would rather set it as an input, set it on the reusable workflow, and it
+overrides the file:
 
 ```yaml
 jobs:

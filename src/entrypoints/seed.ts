@@ -8,11 +8,11 @@
 import * as core from '@actions/core';
 import { ChecksClient, withRetry } from '../checks.js';
 import { fail } from '../github.js';
-import { resolve } from '../resolve.js';
+import { parseContextInput, resolve } from '../resolve.js';
 import type { PlanEntry } from '../types.js';
 
 async function main(): Promise<void> {
-  const resolved = await resolve();
+  const resolved = await resolve(parseContextInput(core.getInput('context')));
   if (!resolved) {
     throw new Error('Could not determine which pull request to seed. Pass the `pr-number` input.');
   }

@@ -407,7 +407,10 @@ export function computeVerdict(input: VerdictInput): VerdictPlan {
       mirrored !== null && forcedOwn !== null
         ? worstOf(mirrored, forcedOwn)
         : (mirrored ?? forcedOwn)!;
-    const decidedByOwn = forcedOwn !== null && verdict === forcedOwn && forcedOwn !== mirrored;
+    // `forcedOwn` is only ever a failure, and it is this PR's own earned result.
+    // It stands whether or not the authority happens to be failing too, and
+    // regardless of propagate-failures, which governs inherited verdicts only.
+    const decidedByOwn = forcedOwn !== null;
 
     if (verdict === 'failure' && !config.propagateFailures && !decidedByOwn) {
       return {
