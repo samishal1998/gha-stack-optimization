@@ -6,7 +6,9 @@
 # │ into a `uses:` reference, so the three action references are hardcoded.   │
 # │                                                                          │
 # │   sed -i 's|your-org/stack-gate|ACTUAL-OWNER/stack-gate|g' \              │
-# │     .github/workflows/gate.yml README.md                                 │
+# │     .github/workflows/gate.yml README.md GUIDE.md                        │
+# │                                                                          │
+# │ Check nothing was missed:  grep -rn your-org .                           │
 # └──────────────────────────────────────────────────────────────────────────┘
 #
 # Two entry points, one pipeline:
