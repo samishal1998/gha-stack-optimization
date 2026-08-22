@@ -27791,7 +27791,7 @@ async function main() {
     sha: ctx.sha,
     status: waiting ? "in_progress" : "queued",
     conclusion: null,
-    reason: waiting ? "awaiting-authority" : "authority-needs-own-ci",
+    reason: "seeded",
     title: waiting ? `Waiting on #${ctx.authorityPr}` : "Waiting for CI",
     summary: waiting ? `Gated by #${ctx.authorityPr} (${ctx.authorityRole}). CI will not run on this PR; its verdict is mirrored from the authority once that run completes.` : "Waiting for this PR\u2019s CI to establish a verdict.",
     details_url: null,

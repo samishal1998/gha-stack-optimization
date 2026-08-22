@@ -112,6 +112,11 @@ export async function resolvePrForSha(
 
   // Fork PRs land here: their head SHA is not associated with a base-repo
   // commit, but the PR itself is still listed against the base repo.
+  //
+  // This paginates every open PR, so it costs one request per 100 of them. That
+  // is cheap at fifty open PRs and noticeable at five hundred — acceptable
+  // because only fork PRs reach this tier, and cross-repository stacks are out
+  // of scope, so a fork PR resolves once and is then treated as standalone.
   const open = await octokit.paginate(octokit.rest.pulls.list, {
     ...repo,
     state: 'open',

@@ -45,7 +45,7 @@ async function main(): Promise<void> {
     sha: ctx.sha,
     status: waiting ? 'in_progress' : 'queued',
     conclusion: null,
-    reason: waiting ? 'awaiting-authority' : 'authority-needs-own-ci',
+    reason: 'seeded',
     title: waiting ? `Waiting on #${ctx.authorityPr}` : 'Waiting for CI',
     summary: waiting
       ? `Gated by #${ctx.authorityPr} (${ctx.authorityRole}). CI will not run on this PR; ` +

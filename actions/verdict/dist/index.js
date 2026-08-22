@@ -29974,7 +29974,10 @@ async function main() {
   setOutput("is-authoritative", String(isAuthoritative));
   setOutput("affected-count", String(plan.length));
   setOutput("check-name", config.checkName);
-  info(`Trigger: ${trigger}. Plan (${plan.length} check${plan.length === 1 ? "" : "s"}):`);
+  const runId = optionalString("run-id");
+  info(
+    `Trigger: ${trigger}${runId ? ` (CI run ${runId})` : ""}. Plan (${plan.length} check${plan.length === 1 ? "" : "s"}):`
+  );
   for (const entry2 of plan) {
     info(
       `  #${entry2.pr} ${entry2.sha.slice(0, 7)} -> ${entry2.status}${entry2.conclusion ? `/${entry2.conclusion}` : ""} (${entry2.reason})`
