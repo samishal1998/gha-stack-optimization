@@ -283,6 +283,38 @@ describe('forced runs (escape hatches)', () => {
     expect(entries[0]!.conclusion).toBe('failure');
   });
 
+  it('reports its own failure even when the authority is failing too', () => {
+    // Previously suppressed: the two conclusions matched, so this fell into the
+    // propagate-failures hold and the PR's own earned failure vanished.
+    const { plan: entries } = plan({
+      ctx: contextFor(stack, 2),
+      trigger: 'ci-completed',
+      ownConclusion: 'failure',
+      forcedRun: true,
+      authorityCheck: check('own-ci', 'failure'),
+      config: { ...DEFAULT_CONFIG, propagateFailures: false },
+    });
+    expect(entries[0]!.status).toBe('completed');
+    expect(entries[0]!.conclusion).toBe('failure');
+    expect(entries[0]!.reason).toBe('forced-run-failure');
+    expect(entries[0]!.provenance.src).toBe('own-ci');
+  });
+
+  it('records own-ci provenance when its own forced failure decides the verdict', () => {
+    for (const authorityCheck of [null, check('own-ci', 'success'), check('own-ci', 'failure')]) {
+      const { plan: entries } = plan({
+        ctx: contextFor(stack, 2),
+        trigger: 'ci-completed',
+        ownConclusion: 'failure',
+        forcedRun: true,
+        authorityCheck,
+      });
+      expect(entries[0]!.conclusion).toBe('failure');
+      expect(entries[0]!.provenance.src).toBe('own-ci');
+      expect(entries[0]!.provenance.forced).toBe(true);
+    }
+  });
+
   it('still defers to the authority when its own forced run passed', () => {
     const { plan: entries } = plan({
       ctx: contextFor(stack, 2),

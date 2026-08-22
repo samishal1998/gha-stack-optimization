@@ -272,7 +272,7 @@ people wiring the pieces up themselves.
 
 | State   | `status`      | `conclusion` | Meaning                                                               |
 | ------- | ------------- | ------------ | --------------------------------------------------------------------- |
-| Seeded  | `queued`      | —            | PR opened or synced; the authority is not resolved yet                |
+| Seeded  | `queued`      | —            | Written by `seed`, on a PR that owns its own verdict                  |
 | Waiting | `in_progress` | —            | Authority identified; its CI is running, or it needs a run of its own |
 | Pass    | `completed`   | `success`    | The authority passed                                                  |
 | Fail    | `completed`   | `failure`    | The authority failed                                                  |
@@ -280,8 +280,10 @@ people wiring the pieces up themselves.
 A check is **always** present on every open PR's head commit. A missing check is
 the one state that hard-blocks a merge with no recourse, so it must never happen.
 
-When a PR's head commit changes, the new commit starts at `queued`. It does not
-inherit the old commit's verdict. When an authority's verdict changes, every
+When a PR's head commit changes, the new commit **does not inherit** the old
+commit's verdict. It starts in a non-verdict state: `queued` if `seed` runs and the
+PR owns its own verdict, `in_progress` otherwise. (Only `seed` ever writes
+`queued`; the gate itself writes `in_progress` or a conclusion.) When an authority's verdict changes, every
 mirroring PR in its segment is rewritten, including from `success` back to
 `failure` and back again.
 
@@ -296,22 +298,21 @@ Several things change a PR's correct verdict without any CI running at all. The
 `pull_request_target` triggers on the gate workflow handle all of them, by
 re-deriving the verdict from the checks already on record. No CI is re-dispatched.
 
-| What changed                        | What the gate does                                                                                                                                         |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Checkpoint label added              | The promoted PR is now an authority but has never run its own CI. Its inherited check is invalidated and its segment holds at `in_progress` until it runs. |
-| Checkpoint label removed            | The PR rejoins the segment above and mirrors it again.                                                                                                     |
-| Head merged or closed               | The next PR down becomes the head, and its verdict propagates.                                                                                             |
-| Draft flipped to ready, or to draft | Segment boundaries move (see [`skip-draft-head`](GUIDE.md#skip-draft-head)) and verdicts are re-derived.                                                   |
-| PR removed from the stack           | Its inherited green no longer applies. The check holds at `in_progress` with instructions to re-run CI.                                                    |
-| Parent receives a direct push       | The new commit is seeded as `queued` and waits for the authority's next verdict. Its own CI still does not run.                                            |
-
-**How the gate knows an earned green from an inherited one.** Every check it
-writes records its provenance in the check run's `external_id`: whether the
-verdict came from this commit's own CI, was mirrored from an authority, or is a
-placeholder hold. Without that record, a mirrored `success` would be
-indistinguishable from an earned one, and both "this PR left its stack" and "this
-PR was just promoted to checkpoint" would be unanswerable. A check whose
-provenance is missing or unrecognised is never treated as an established verdict.
+| What changed                                                                      | What the gate does                                                                                                                                                                                                                                                                    |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Checkpoint label added                                                            | The promoted PR is now an authority but has never run its own CI. Its inherited check is invalidated and its segment holds at `in_progress` until it runs.                                                                                                                            |
+| Checkpoint label removed                                                          | The PR rejoins the segment above and mirrors it again.                                                                                                                                                                                                                                |
+| Head merged or closed                                                             | The next PR down becomes the head. It is now an authority, but the check it was carrying was mirrored from the PR that just merged, so the gate will not honour it — that PR and everything below it hold at `in_progress` until it runs its own CI. See [Limitations](#limitations). |
+| Draft flipped to ready, or to draft                                               | Segment boundaries move (see [`skip-draft-head`](GUIDE.md#skip-draft-head)) and verdicts are re-derived.                                                                                                                                                                              |
+| PR removed from the stack                                                         | Its inherited green no longer applies. The check holds at `in_progress` with instructions to re-run CI.                                                                                                                                                                               |
+| Parent receives a direct push                                                     | The new commit gets an `in_progress` check naming its authority, or immediately re-mirrors that authority's verdict if one is already established. Its own CI still does not run.                                                                                                     |
+| **How the gate knows an earned green from an inherited one.** Every check it      |
+| writes records its provenance in the check run's `external_id`: whether the       |
+| verdict came from this commit's own CI, was mirrored from an authority, or is a   |
+| placeholder hold. Without that record, a mirrored `success` would be              |
+| indistinguishable from an earned one, and both "this PR left its stack" and "this |
+| PR was just promoted to checkpoint" would be unanswerable. A check whose          |
+| provenance is missing or unrecognised is never treated as an established verdict. |
 
 ---
 
@@ -388,6 +389,14 @@ from fork PRs through `workflow_run`. Therefore:
   without touching the decision logic.
 - A stack with one open member is reported as not-in-stack. With nothing above or
   below it, there is nothing to mirror, so it runs its own CI.
+- **Merging the head of a stack temporarily blocks the rest of it.** The next PR
+  down is now an authority, but the check it holds was mirrored from the PR you
+  just merged, so the gate will not honour it. That PR and everything below it
+  hold at `in_progress` until it runs its own CI. Usually this resolves itself
+  within moments, because merging the head restacks the PR below it and that push
+  triggers CI — but if its head commit does not move, re-run CI on the new head.
+  This is the same invalidation as the checkpoint case below, and exists for the
+  same reason: the alternative is honouring a verdict the PR never earned.
 - Promoting a PR to checkpoint **temporarily blocks its segment** until that PR
   runs real CI. This is deliberate — the alternative is honouring a verdict it
   never earned — but it is a merge block, so promote before you need to merge.
@@ -432,8 +441,8 @@ scratch repository with the stacked-PR preview enabled:
    pointing at the head's failing run.
 3. **Checkpoint, then partial merge.** Label `#2` as a checkpoint. It should run
    its own CI. With the head still red, `#1` and `#2` should be mergeable.
-4. **Force-push a parent.** Its check should return to `queued`, then settle back
-   to the authority's verdict without its own CI running.
+4. **Force-push a parent.** Its check should return to a non-verdict state, then
+   settle back to the authority's verdict without its own CI running.
 5. **Remove a PR from the stack.** Its check should move to `in_progress` with
    instructions, not stay green.
 

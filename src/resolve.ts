@@ -25,13 +25,13 @@ export interface Resolved {
  * Returns null when no pull request can be identified, which is a normal
  * outcome for a `workflow_run` triggered by a push to a branch with no PR.
  */
-export async function resolve(): Promise<Resolved | null> {
+export async function resolve(preresolved?: StackContext | null): Promise<Resolved | null> {
   const octokit = makeOctokit();
   const repo = getRepo();
-  const prNumber = await resolveTargetPr(octokit, repo);
+  const prNumber = preresolved?.pr ?? (await resolveTargetPr(octokit, repo));
   if (prNumber === null) return null;
   const config = await resolveConfig(octokit, repo);
-  const ctx = await resolveContext(octokit, repo, config, prNumber);
+  const ctx = preresolved ?? (await resolveContext(octokit, repo, config, prNumber));
   return { octokit, repo, config, ctx, prNumber };
 }
 

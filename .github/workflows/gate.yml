@@ -27,22 +27,28 @@ name: Stack Gate
 
 on:
   workflow_call:
+    # These inputs deliberately carry NO defaults. An action input always beats
+    # the repository config file, so a default here would be forwarded as a real
+    # value and would silently override `.github/stack-gate.yml`. For check-name
+    # that is catastrophic: the gate would write `stack-gate` while branch
+    # protection waited for the configured name, blocking every PR forever.
+    # Left unset, these arrive as empty strings, which the actions treat as
+    # absent — so the config file is honoured, and the built-in defaults
+    # (stack-gate, stack-checkpoint, .github/stack-gate.yml) apply if there is
+    # no config file.
     inputs:
       check-name:
-        description: 'Gate check run name. This is the name branch protection requires.'
+        description: 'Gate check run name. This is the name branch protection requires. Overrides the config file. Default: stack-gate.'
         type: string
         required: false
-        default: 'stack-gate'
       checkpoint-label:
-        description: 'Label marking a PR as a checkpoint.'
+        description: 'Label marking a PR as a checkpoint. Overrides the config file. Default: stack-checkpoint.'
         type: string
         required: false
-        default: 'stack-checkpoint'
       config-path:
-        description: 'Repository config file, read from the default branch.'
+        description: 'Repository config file, read from the default branch. Default: .github/stack-gate.yml.'
         type: string
         required: false
-        default: '.github/stack-gate.yml'
       dry-run:
         description: 'Log the plan without writing any check runs.'
         type: boolean
