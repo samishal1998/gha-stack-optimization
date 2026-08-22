@@ -31,6 +31,9 @@ inputs:
   propagate-failures:
     description: 'Report failures on mirroring PRs, rather than holding them `in_progress`.'
     required: false
+  skip-draft-head:
+    description: 'Treat a draft head as an authority, or fall through to the highest non-draft PR.'
+    required: false
   config-path:
     description: 'Path to the repository config file, read from the default branch.'
     required: false
