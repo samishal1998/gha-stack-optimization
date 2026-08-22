@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      # The actions run from committed bundles, so a stale dist/ means the
+      # published action does not match the source it was reviewed as.
+      - name: Verify committed bundles are current
+        run: |
+          npm run build
+          if ! git diff --exit-code --stat -- actions; then
+            echo "::error::actions/*/dist is out of date. Run 'npm run build' and commit the result."
+            exit 1
+          fi

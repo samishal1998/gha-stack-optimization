@@ -1,0 +1,61 @@
+name: 'stack-gate: context'
+description: 'Resolve stacked-PR topology: authorities, segments and mirroring relationships. Pure read.'
+author: 'stack-gate'
+
+inputs:
+  token:
+    description: 'Token used for API calls. Needs `pull-requests: read` and `contents: read`.'
+    required: false
+    default: ${{ github.token }}
+  pr-number:
+    description: 'Pull request to resolve. Inferred from the event when omitted.'
+    required: false
+  checkpoint-label:
+    description: 'Label marking a PR as a checkpoint (an authority that owns its own verdict).'
+    required: false
+  config-path:
+    description: 'Path to the repository config file, read from the default branch.'
+    required: false
+    default: '.github/stack-gate.yml'
+
+outputs:
+  in-stack:
+    description: 'Whether the PR belongs to a stack with more than one open member.'
+  stack-id:
+    description: "Stable identifier for the stack (the repository's stack number)."
+  target-branch:
+    description: "The stack's final target branch, not the PR's direct base."
+  position:
+    description: '0-indexed position from the root, over open members.'
+  size:
+    description: 'Number of open members in the stack.'
+  sha:
+    description: "This PR's head SHA."
+  is-head:
+    description: 'Whether this is the topmost PR in the stack.'
+  is-root:
+    description: 'Whether this is the bottom PR in the stack.'
+  is-checkpoint:
+    description: 'Whether this PR carries the checkpoint label.'
+  is-authority:
+    description: 'Whether this PR runs real CI and establishes a verdict.'
+  authority-pr:
+    description: "PR number whose verdict governs this PR's check."
+  authority-sha:
+    description: 'Head SHA of the authority.'
+  authority-role:
+    description: 'Why the authority is one: `head`, `checkpoint` or `non-draft-head`.'
+  segment:
+    description: "JSON `[{pr, sha, is_authority}]` for this PR's segment, authority first."
+  ancestors:
+    description: 'JSON list of open PRs below this one, ordered root-ward.'
+  descendants:
+    description: 'JSON list of open PRs above this one, ordered head-ward.'
+  stack:
+    description: 'JSON list of the full open topology, root to head.'
+  context:
+    description: 'The complete resolved context as JSON, for passing to other stack-gate actions.'
+
+runs:
+  using: node24
+  main: dist/index.js

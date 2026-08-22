@@ -1,0 +1,98 @@
+# The batteries-included consumer path: wires context -> verdict -> propagate.
+#
+# ┌──────────────────────────────────────────────────────────────────────────┐
+# │ BEFORE PUBLISHING: replace `your-org` below with the owner of this        │
+# │ repository. A reusable workflow cannot interpolate its own repository     │
+# │ into a `uses:` reference, so the three action references are hardcoded.   │
+# │                                                                          │
+# │   sed -i 's|your-org/stack-gate|ACTUAL-OWNER/stack-gate|g' \              │
+# │     .github/workflows/gate.yml README.md                                 │
+# └──────────────────────────────────────────────────────────────────────────┘
+#
+# Two entry points, one pipeline:
+#
+#   workflow_run         a CI run finished, so there may be a new verdict to
+#                        establish and propagate down a segment.
+#   pull_request_target  something structural changed (a checkpoint label, a
+#                        draft transition, a merge, stack membership) without any
+#                        CI running. The verdict is re-derived from the checks
+#                        already on record. `pull_request_target` rather than
+#                        `pull_request` because a fork PR's `pull_request` token
+#                        is read-only and could not post the check at all.
+#
+# Security: this workflow runs in the base-repo context with a write-capable
+# token and is reachable from fork PRs. It never checks out or executes any code
+# from the pull request under evaluation — it reads metadata only.
+name: Stack Gate
+
+on:
+  workflow_call:
+    inputs:
+      check-name:
+        description: 'Gate check run name. This is the name branch protection requires.'
+        type: string
+        required: false
+        default: 'stack-gate'
+      checkpoint-label:
+        description: 'Label marking a PR as a checkpoint.'
+        type: string
+        required: false
+        default: 'stack-checkpoint'
+      config-path:
+        description: 'Repository config file, read from the default branch.'
+        type: string
+        required: false
+        default: '.github/stack-gate.yml'
+      dry-run:
+        description: 'Log the plan without writing any check runs.'
+        type: boolean
+        required: false
+        default: false
+    secrets:
+      token:
+        description: 'Overrides GITHUB_TOKEN. See the recursion warning in the README.'
+        required: false
+
+permissions:
+  checks: write
+  pull-requests: read
+  actions: read
+  contents: read
+
+jobs:
+  gate:
+    # A cancelled CI run proves nothing, so there is no verdict to compute.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion != 'cancelled'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve stack topology
+        id: context
+        uses: your-org/stack-gate/actions/context@v1
+        with:
+          token: ${{ secrets.token || github.token }}
+          checkpoint-label: ${{ inputs.checkpoint-label }}
+          config-path: ${{ inputs.config-path }}
+
+      - name: Compute verdict plan
+        id: verdict
+        uses: your-org/stack-gate/actions/verdict@v1
+        with:
+          token: ${{ secrets.token || github.token }}
+          context: ${{ steps.context.outputs.context }}
+          # Absent on a pull_request event, which is what selects reconcile mode.
+          conclusion: ${{ github.event.workflow_run.conclusion }}
+          run-id: ${{ github.event.workflow_run.id }}
+          run-url: ${{ github.event.workflow_run.html_url }}
+          check-name: ${{ inputs.check-name }}
+          config-path: ${{ inputs.config-path }}
+
+      - name: Post check runs
+        if: steps.verdict.outputs.affected-count != '0'
+        uses: your-org/stack-gate/actions/propagate@v1
+        with:
+          token: ${{ secrets.token || github.token }}
+          plan: ${{ steps.verdict.outputs.plan }}
+          check-name: ${{ steps.verdict.outputs.check-name }}
+          dry-run: ${{ inputs.dry-run }}
