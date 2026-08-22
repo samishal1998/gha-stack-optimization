@@ -3,17 +3,23 @@
 **Composable GitHub Actions for stack-aware CI gating.**
 
 In a stacked pull request, every PR in the chain runs the full CI suite. For a
-five-PR stack that is five full runs, where only the head meaningfully validates
-anything — the head contains every change below it. Everything underneath is
-burning runner minutes to re-prove a subset of what the head already proved.
+five-PR stack that means five full runs, even though only the head meaningfully
+validates anything — the head contains every change below it. Everything
+underneath is spending runner minutes to re-prove a subset of what the head has
+already proved.
 
-`stack-gate` runs CI **once per stack segment** instead of once per PR, and
-posts a single stable required check on every PR so nothing is ever blocked on a
+`stack-gate` runs CI **once per stack segment** instead of once per PR, and posts
+a single stable required check on every PR so that nothing is ever blocked by a
 check that never reported.
 
-Built on GitHub's [native stacked pull requests][native] (public preview), so
-stack topology is read from the API rather than inferred from labels, body
-markers, or `base_ref` chains.
+It is built on GitHub's [native stacked pull requests][native] (public preview),
+so the stack's shape is read from the API. There are no label conventions to
+follow, no body markers to maintain, and no `base_ref` chains to walk.
+
+> **New here?** This page covers the model, the two warnings you should read
+> before adopting it, and a working setup in three steps. For what each action
+> does individually, how to compose them yourself, and troubleshooting, see the
+> **[full guide](GUIDE.md)**.
 
 [native]: https://docs.github.com/en/pull-requests/get-started/about-stacked-prs
 
@@ -21,86 +27,104 @@ markers, or `base_ref` chains.
 
 ## How it works
 
-> An **authority** is a PR that runs real CI and establishes a verdict: the
-> stack head, or any PR labelled as a **checkpoint**.
->
-> A **segment** is a maximal contiguous run of PRs topped by an authority,
-> extending downward until (but not including) the next authority below.
+**An authority** is a PR that runs the real CI suite and establishes a verdict.
+There are two ways to become one: be the head of the stack, or carry the
+checkpoint label.
 
-Every PR belongs to exactly one segment. The authority runs the real suite;
-everyone else skips CI and mirrors the authority's verdict.
+**A segment** is a run of consecutive PRs topped by an authority, extending
+downward until it reaches the next authority below.
+
+Every PR belongs to exactly one segment. The authority runs the real suite.
+Everyone else runs no CI at all, and the gate copies the authority's verdict onto
+them.
 
 ```
 #6  head          ← authority   ┐
-#5                              │ segment A   #6 runs CI; #4, #5 mirror it
+#5                              │ segment A   #6 runs CI; #4 and #5 mirror it
 #4                              ┘
 #3  [checkpoint]  ← authority   ┐
-#2                              │ segment B   #3 runs CI; #1, #2 mirror it
+#2                              │ segment B   #3 runs CI; #1 and #2 mirror it
 #1  root                        ┘
 ```
 
-If `#6` goes red, `#4` and `#5` go red. `#1`–`#3` are untouched, so the bottom
-half of the stack stays mergeable. Adding a checkpoint is the single knob that
-trades CI minutes for merge independence, and it is opt-in per PR.
+Two PRs run CI here instead of six. If `#6` goes red, `#4` and `#5` go red with
+it, but `#1` through `#3` are untouched, so the bottom half of the stack stays
+mergeable. Adding a checkpoint is the one knob that trades CI minutes for merge
+independence, and it is opt-in per PR.
 
-Two moving parts, deliberately decoupled:
+There are two moving parts, and keeping them separate is the point:
 
-1. **In your CI workflow** — one step at the top asks whether this PR is an
-   authority. Non-authorities exit before any checkout, install or test run.
-   Your CI workflow never posts the required check and knows nothing about
-   verdicts.
-2. **Out of band** — a gate workflow on `workflow_run: [completed]` resolves the
-   stack, computes a verdict plan, and posts check runs across the affected PRs.
+1. **In your CI workflow**, one step asks whether this PR is an authority. If it
+   is not, the workflow exits before any checkout, install, or test run. Your CI
+   workflow never posts the required check and does not know that verdicts exist.
 
-`workflow_run` is the load-bearing choice: when a new head is pushed and its CI
-completes, the gate re-posts fresh verdicts onto every ancestor in the segment.
-No `repository_dispatch`, no re-running parent workflows, no fan-out of CI. That
-is the stale-parent problem solved for free.
+2. **Out of band**, a gate workflow resolves the stack, works out what should be
+   reported, and posts check runs across the affected PRs.
 
-The required check is **not** a workflow job. A job's status is bound to the SHA
-of the run that produced it and cannot be retroactively rewritten. Instead the
-gate writes a check run under a stable name (default: `stack-gate`) via the
-Checks API, which it can rewrite on any SHA at any time. Branch protection
-requires _that_ name.
+The gate is triggered by `workflow_run`, and that choice does a lot of work. When
+a new head is pushed and its CI completes, the gate wakes up and re-posts fresh
+verdicts onto every ancestor in the segment. There is no `repository_dispatch`, no
+re-running of parent workflows, and no fan-out of CI. The stale-parent problem
+solves itself.
+
+The required check is deliberately **not** a workflow job. A job's status is
+permanently bound to the commit of the run that produced it, and cannot be
+rewritten later — which is exactly what a parent PR needs when a descendant
+changes. Instead the gate writes a check run under a stable name (default
+`stack-gate`) through the Checks API, which it can rewrite on any commit at any
+time. Branch protection requires that name. Your CI jobs stay visible for
+debugging, but are not required.
 
 ---
 
-## ⚠️ The one place this trades rigour for speed
+## Before you rely on this: mirroring and partial merges
 
 **Mirroring is sound for a whole segment. It is not sound for part of one.**
 
-The authority's tree is a superset of every PR beneath it in the same segment, so
-merging a whole segment produces exactly the tree the authority tested. Merging
-_part_ of a segment does not — those intermediate trees were never built.
+The authority's tree contains every change in every PR beneath it in the same
+segment. So when you merge a whole segment, the result is exactly the tree the
+authority tested. That is verified.
 
-If you intend to merge the bottom half of a stack, **promote your intended cut
-point to a checkpoint first** (add the `stack-checkpoint` label). It will run its
-own CI and establish a verdict that genuinely covers what you are merging.
+When you merge only _part_ of a segment, the result is a tree that nothing ever
+built. Suppose segment A above is `#4`, `#5`, `#6`, and you merge `#4` and `#5`
+while `#6` is still open. Both carry `#6`'s green check — but that check was
+earned by a tree that included `#6`'s changes, and you did not merge those.
 
-Choose this knowingly. Everything else in this project is bookkeeping; this is
-the actual trade.
+**So if you intend to merge part of a stack, promote your intended cut point to a
+checkpoint first.** Add the `stack-checkpoint` label to it. It will run its own
+CI and establish a verdict that genuinely covers the tree you are about to merge.
 
-## ⚠️ Recursion, if you replace `GITHUB_TOKEN`
+This is the one place the system trades rigour for speed, and it is worth
+choosing knowingly. Everything else here is bookkeeping.
 
-Events caused by `GITHUB_TOKEN` do not trigger further workflow runs, which is
-what keeps the gate from looping. **If you substitute a PAT or GitHub App token,
-the check runs the gate posts _can_ trigger `check_run` and `check_suite`
-events.** Any workflow of yours listening on those must guard against re-entry,
-or you will build an infinite loop that bills you for it.
+## Before you replace GITHUB_TOKEN
 
-A second consequence: a check run can only be updated by the app that created
-it. Switching `token` to a different identity mid-flight means the gate cannot
-update the checks it previously wrote — it creates new ones instead, leaving one
-stale duplicate per PR until the next push. Pick an identity before you enable
+Every action takes a `token` input, so the check can appear under a bot or App
+identity instead of the default one. There are two consequences, and the first
+one can cost you money.
+
+**Recursion.** Events caused by `GITHUB_TOKEN` do not trigger further workflow
+runs, and that is the only thing keeping the gate from looping. If you substitute
+a PAT or a GitHub App token, the check runs the gate posts **can** trigger
+`check_run` and `check_suite` events. Any workflow of yours listening on those
+must guard against re-entry, or you will build an infinite loop that bills you
+for every iteration.
+
+**Identity is sticky.** A check run can only be updated by the app that created
+it. If you switch `token` to a different identity after the gate has already
+written checks, it cannot update those — it creates new ones instead, leaving one
+stale duplicate per PR until the next push. Pick an identity before you turn on
 branch protection, not after.
 
 ---
 
 ## Setup
 
-Two files. One edit to your CI workflow, one new workflow.
+Two files: one edit to your CI workflow, one new workflow.
 
 ### 1. Gate your CI workflow
+
+Add a small job that makes the decision, and have your real jobs depend on it.
 
 ```yaml
 jobs:
@@ -124,6 +148,9 @@ jobs:
       # ... your existing steps, unchanged
 ```
 
+Every real job needs `needs: gate-decision` and the same `if:` condition. The
+decision job takes a few seconds, so a mirrored PR costs almost nothing.
+
 ### 2. Add the gate workflow
 
 ```yaml
@@ -132,7 +159,7 @@ name: Stack Gate
 
 on:
   workflow_run:
-    workflows: ['CI'] # must match your CI workflow's `name:`
+    workflows: ['CI'] # must match your CI workflow's `name:`, not its filename
     types: [completed]
   pull_request_target:
     types:
@@ -153,8 +180,6 @@ permissions:
   contents: read
 
 concurrency:
-  # Serialise every gate run in the repository. See the note below — both parts
-  # of this matter.
   group: stack-gate
   cancel-in-progress: false # a cancelled gate leaves checks half-written
   queue: max # without this, queued gate runs are silently dropped
@@ -167,139 +192,136 @@ jobs:
       checkpoint-label: stack-checkpoint
 ```
 
-The PR triggers are not decoration. They are what makes a checkpoint label added
-mid-flight, a draft flipped to ready, a merged parent, or a PR leaving the stack
-take effect without waiting for a CI run. See
-[Reconciliation](#reconciliation).
+Three parts of that file are easy to get wrong, so they are worth explaining.
 
-**Why `pull_request_target` and not `pull_request`.** A `pull_request` event from
-a fork gets a read-only token no matter what the `permissions:` block says, so
-the gate could not post a check on a fork PR — and if `stack-gate` is required,
-that PR would be blocked forever. `pull_request_target` runs in the
-base-repository context with a writable token.
+**The `pull_request_target` triggers are not decoration.** `workflow_run` only
+fires when CI completes, but several things change a PR's correct verdict without
+any CI running: a checkpoint label added mid-flight, a draft flipped to ready, a
+parent merged, a PR removed from the stack. These triggers are what make those
+take effect. See [Reconciliation](#reconciliation).
+
+**Why `pull_request_target` rather than `pull_request`.** A `pull_request` event
+from a fork receives a read-only token no matter what the `permissions:` block
+says. The gate could not post a check on a fork PR at all — and if `stack-gate`
+is a required check, that PR would be blocked forever.
 
 The usual danger of `pull_request_target` is checking out and executing PR code
-with that token. **This gate never checks out anything** — see
-[Security](#security). That is precisely the condition under which
-`pull_request_target` is the correct trigger rather than a liability.
+with a privileged token. **This gate never checks out anything.** It reads
+metadata only, which is precisely the condition that makes
+`pull_request_target` the correct trigger here rather than a liability. See
+[Security](#security).
 
-One consequence worth knowing: `pull_request_target` always runs the workflow
-file from your default branch, so changes to this file only take effect once
-merged.
+One consequence: `pull_request_target` always runs the version of the workflow
+file on your default branch, so changes to it only take effect once merged.
 
-**Why the concurrency block is repo-wide, and why `queue: max`.** Two gate runs
-touching the same stack must not interleave — one writing #6's fresh verdict
-while another writes #4's stale one produces exactly the contradiction the check
-exists to prevent. The natural key is the stack id, but concurrency groups are
-evaluated before any step runs, and no expression available at trigger time
-identifies the stack: `workflow_run` carries only the head branch, and a stacked
-PR's `base.ref` is its parent's branch rather than the stack's target. So the
-group is the whole repository. Gate runs take seconds and never run tests, so
-this costs very little.
+**Why the concurrency group is repo-wide, and why `queue: max`.** Two gate runs
+touching the same stack must not interleave. One writing `#6`'s fresh verdict
+while another writes `#4`'s stale one produces exactly the contradiction the check
+exists to prevent.
 
-`queue: max` is not optional. By default GitHub allows **one** pending run per
-concurrency group and cancels any earlier pending one — so under load, gate runs
-would be dropped, and a dropped gate run is a verdict that never gets written.
-`queue: max` queues up to 100 in FIFO order instead. (It cannot be combined with
-`cancel-in-progress: true`, which you do not want here anyway.)
+The natural key would be the stack id, but concurrency groups are evaluated
+before any step runs, and nothing available at trigger time identifies the stack:
+a `workflow_run` payload carries only the head branch, and a stacked PR's
+`base.ref` is its parent's branch rather than the stack's target. So the group is
+the whole repository. Gate runs take seconds and never run tests, so this costs
+very little.
+
+`queue: max` is not optional. By default GitHub allows exactly **one** pending run
+per concurrency group and cancels any earlier pending one. Under load, gate runs
+would be dropped — and a dropped gate run is a verdict that never gets written.
+`queue: max` queues up to 100 in FIFO order instead. It cannot be combined with
+`cancel-in-progress: true`, which you do not want here anyway.
 
 ### 3. Make `stack-gate` the required check
 
-In branch protection (or a ruleset), require the status check named
-`stack-gate`. Leave your CI jobs visible but **not** required — they are for
-debugging; the gate is the contract.
+In branch protection or a ruleset, require the status check named `stack-gate`.
+Leave your CI jobs visible but **not** required: they are for debugging, and the
+gate is the contract.
 
-Open one stacked PR before enabling the requirement, so you can see the check
-appear and confirm the name matches.
-
----
-
-## Actions
-
-Six actions plus a reusable workflow. Each is independently usable; the reusable
-workflow is the batteries-included path.
-
-| Action                                     | What it does                                                                                                                |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| [`actions/context`](actions/context)       | Resolves stack topology: authorities, segments, mirroring relationships. Pure read; every other action consumes its output. |
-| [`actions/should-run`](actions/should-run) | The skip decision. First step in your CI workflow.                                                                          |
-| [`actions/post-check`](actions/post-check) | Low-level primitive: create or update a check run on a SHA, idempotently.                                                   |
-| [`actions/verdict`](actions/verdict)       | Computes what should be reported. Writes nothing.                                                                           |
-| [`actions/propagate`](actions/propagate)   | Executes a plan, with a staleness guard and bounded concurrency.                                                            |
-| [`actions/seed`](actions/seed)             | Posts the gate check immediately on a PR event, so it always exists.                                                        |
-
-The reusable workflow's PR path already guarantees the check exists, so
-`actions/seed` is not needed alongside it. Reach for `seed` directly if you want
-the check posted in a couple of seconds from inside your CI workflow — or if you
-are wiring the pieces yourself instead of using the reusable workflow.
-
-Each action's `action.yml` documents its inputs and outputs. The two that matter
-most: `is-authority` drives the skip decision, and `segment` drives propagation.
-Consumers rarely need the raw `stack` output.
-
-`verdict` and `propagate` are separate on purpose. Computation is pure and
-unit-tested from fixtures; mutation is a thin loop over the plan. That split is
-also what makes `dry-run` worth having — set it on the reusable workflow and the
-whole pipeline logs what it would write without touching anything.
+Do this last. Open one stacked PR first, confirm the check appears with the name
+you expect, and only then make it required. The guide has a
+[safe rollout sequence](GUIDE.md#trying-it-safely-on-a-live-repository) that uses
+`dry-run` so a mistake costs a re-run rather than a repository full of blocked
+PRs.
 
 ---
 
-## Check run states
+## What is in the box
+
+Six actions plus a reusable workflow. The reusable workflow is the
+batteries-included path and wires three of them together for you. Each action is
+independently usable, and the [guide](GUIDE.md#the-actions) documents every input,
+output, and behaviour in detail.
+
+| Action                              | What it is for                                                                                |
+| ----------------------------------- | --------------------------------------------------------------------------------------------- |
+| [`should-run`](GUIDE.md#should-run) | Decides whether this PR runs the real CI suite. The one action that goes in your CI workflow. |
+| [`context`](GUIDE.md#context)       | Resolves the stack: authorities, segments, who mirrors whom. Pure read, no writes.            |
+| [`verdict`](GUIDE.md#verdict)       | Works out which checks should be posted where. Returns a plan and writes nothing.             |
+| [`propagate`](GUIDE.md#propagate)   | Executes a plan, with idempotent writes and a staleness guard.                                |
+| [`seed`](GUIDE.md#seed)             | Posts the gate check immediately, so a PR is never blocked by a missing check.                |
+| [`post-check`](GUIDE.md#post-check) | The raw primitive: create or update one check run on one commit.                              |
+
+If you use the reusable workflow, you need `should-run` and nothing else — the
+workflow's PR path already guarantees the check exists, so `seed` is only for
+people wiring the pieces up themselves.
+
+---
+
+## The check run contract
 
 | State   | `status`      | `conclusion` | Meaning                                                               |
 | ------- | ------------- | ------------ | --------------------------------------------------------------------- |
-| Seeded  | `queued`      | —            | PR opened or synced; authority not yet resolved                       |
+| Seeded  | `queued`      | —            | PR opened or synced; the authority is not resolved yet                |
 | Waiting | `in_progress` | —            | Authority identified; its CI is running, or it needs a run of its own |
-| Pass    | `completed`   | `success`    | Authority passed                                                      |
-| Fail    | `completed`   | `failure`    | Authority failed                                                      |
+| Pass    | `completed`   | `success`    | The authority passed                                                  |
+| Fail    | `completed`   | `failure`    | The authority failed                                                  |
 
-A check is **always** present on every open PR's head SHA. A missing check is
-the one state that hard-blocks a merge, so it must never occur.
+A check is **always** present on every open PR's head commit. A missing check is
+the one state that hard-blocks a merge with no recourse, so it must never happen.
 
-When a PR's head SHA changes, the new SHA starts at `queued` — it does not
-inherit the old SHA's verdict. When an authority's verdict changes, every
-dependent PR in its segment is rewritten, including from `success` back to
+When a PR's head commit changes, the new commit starts at `queued`. It does not
+inherit the old commit's verdict. When an authority's verdict changes, every
+mirroring PR in its segment is rewritten, including from `success` back to
 `failure` and back again.
 
-`details_url` on a mirrored check points at the **authority's** run, so a red
-parent links straight to the failing head run. The summary names the authority
-(`Gated by #6 (stack head)`), which makes the system legible from the PR UI
-without reading these docs.
+On a mirrored check, the Details link points at the **authority's** run, so a red
+parent takes you straight to the failing head run. The summary names the authority
+(`Gated by #6 (stack head)`), which makes the system legible from the PR page
+without reading any of this.
 
 ### Reconciliation
 
-A `workflow_run` trigger only fires when CI completes. Several things change a
-PR's correct verdict without any CI running at all:
-
-| Change                              | What the gate does                                                                                                                                              |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Checkpoint label added              | The promoted PR is now an authority but has never run its own CI. Its inherited check is invalidated and its whole segment is held `in_progress` until it runs. |
-| Checkpoint label removed            | The PR rejoins the segment above and mirrors it.                                                                                                                |
-| Head merged or closed               | The next PR down becomes head and its verdict re-propagates.                                                                                                    |
-| Draft flipped to ready, or to draft | Segment boundaries move (see `skip-draft-head`) and verdicts are re-derived.                                                                                    |
-| PR leaves the stack                 | Its inherited green no longer applies. The check is held `in_progress` with instructions to re-run CI.                                                          |
-| Parent receives a direct push       | `seed` posts `queued`; it waits for the authority's next verdict. Its own CI still does not run.                                                                |
-
-All of these are handled by the `pull_request` triggers on the gate workflow,
+Several things change a PR's correct verdict without any CI running at all. The
+`pull_request_target` triggers on the gate workflow handle all of them, by
 re-deriving the verdict from the checks already on record. No CI is re-dispatched.
 
-**How the gate tells an earned green from an inherited one:** every check it
-writes records its provenance in the check run's `external_id` — whether the
-verdict came from this SHA's own CI (`own-ci`), was mirrored from an authority
-(`mirror`), or is a placeholder hold. Without that, a mirrored `success` would be
-indistinguishable from an earned one, and "this PR left its stack" or "this PR
-was just promoted to checkpoint" would be unanswerable. A check of unknown
-provenance is never treated as an established verdict.
+| What changed                        | What the gate does                                                                                                                                         |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Checkpoint label added              | The promoted PR is now an authority but has never run its own CI. Its inherited check is invalidated and its segment holds at `in_progress` until it runs. |
+| Checkpoint label removed            | The PR rejoins the segment above and mirrors it again.                                                                                                     |
+| Head merged or closed               | The next PR down becomes the head, and its verdict propagates.                                                                                             |
+| Draft flipped to ready, or to draft | Segment boundaries move (see [`skip-draft-head`](GUIDE.md#skip-draft-head)) and verdicts are re-derived.                                                   |
+| PR removed from the stack           | Its inherited green no longer applies. The check holds at `in_progress` with instructions to re-run CI.                                                    |
+| Parent receives a direct push       | The new commit is seeded as `queued` and waits for the authority's next verdict. Its own CI still does not run.                                            |
+
+**How the gate knows an earned green from an inherited one.** Every check it
+writes records its provenance in the check run's `external_id`: whether the
+verdict came from this commit's own CI, was mirrored from an authority, or is a
+placeholder hold. Without that record, a mirrored `success` would be
+indistinguishable from an earned one, and both "this PR left its stack" and "this
+PR was just promoted to checkpoint" would be unanswerable. A check whose
+provenance is missing or unrecognised is never treated as an established verdict.
 
 ---
 
 ## Configuration
 
-Optional `.github/stack-gate.yml`, overridable per-action by inputs. It is always
-read from the **default branch**, never from the PR under evaluation — a fork PR
-must not be able to reconfigure the gate that judges it.
+Every setting can be given as an action input or in an optional config file.
+Inputs win over the file; the file wins over the defaults.
 
 ```yaml
+# .github/stack-gate.yml
 check-name: stack-gate
 checkpoint-label: stack-checkpoint
 force-run-label: stack-ci-force
@@ -309,49 +331,29 @@ always-run-paths:
   - 'migrations/**'
   - '**/*.sql'
 
-# Report failure on mirroring PRs, or hold them in_progress instead.
+# Report failure on mirroring PRs, or hold them at in_progress instead.
 propagate-failures: true
 
 # Treat a draft head as an authority, or fall through to the highest non-draft.
 skip-draft-head: true
 ```
 
-### Escape hatches
+The file is always read from your **default branch**, never from the PR being
+evaluated, so a fork PR cannot reconfigure the gate that judges it.
 
-`always-run-paths` and `force-run-label` exist for the case where an
-_intermediate_ state is genuinely dangerous even if the final state is fine —
-"any PR touching `migrations/` runs its own CI, wherever it sits in the stack."
-
-For a forced run, **a failure is honoured; a pass is not.** A failure there is
-real breakage in an intermediate tree, which is the entire point of the hatch. A
-pass cannot stand on its own, because a gated run that did no work also
-concludes `success` — so a forced pass falls through to the authority's verdict
-as usual.
-
-### `skip-draft-head`
-
-With `skip-draft-head: true` (the default), a draft head does not govern the
-mergeable part of the stack. Both the head and the highest non-draft PR become
-authorities:
-
-```
-#6  draft head   ← authority   ┐ segment A
-#5  draft                      ┘
-#4               ← authority   ┐
-#3                             │ segment B
-#1, #2                         ┘
-```
-
-A work-in-progress head can go as red as it likes without painting `#1`–`#4`.
-The drafts still get a verdict from a tree that actually contains their changes.
+The guide covers what each setting actually does, including the asymmetry that
+matters most: for a run forced by `always-run-paths` or `force-run-label`, **a
+failure is honoured and a pass is not.** See
+[the configuration reference](GUIDE.md#configuration-reference).
 
 ---
 
 ## Permissions
 
-The default `GITHUB_TOKEN` is sufficient. `checks: write` permits writing check
-runs against **any SHA in the same repository**, including SHAs belonging to
-other PRs. No GitHub App and no PAT are required.
+The default `GITHUB_TOKEN` is enough. `checks: write` permits writing check runs
+against **any commit in the same repository**, including commits belonging to
+other PRs, which is what makes the whole approach work without a GitHub App or a
+PAT.
 
 ```yaml
 permissions:
@@ -361,23 +363,19 @@ permissions:
   contents: read # reads .github/stack-gate.yml from the default branch
 ```
 
-`token` is nonetheless an input on every action, for teams that want the check to
-appear under a bot identity, or whose organisation policy restricts the default
-token. Read the [recursion warning](#️-recursion-if-you-replace-github_token)
-first.
-
 ## Security
 
-The gate workflow runs with `checks: write` in the base-repository context and is
-reachable from fork PRs via `workflow_run`. Therefore:
+The gate runs with `checks: write` in the base-repository context and is reachable
+from fork PRs through `workflow_run`. Therefore:
 
 - **No `actions/checkout` of the head ref in the gate workflow.** It reads
-  metadata only.
-- No execution of any code, script, or dependency from the PR under evaluation.
-- Values read from a PR (title, branch name, label text) are treated as
-  untrusted. Check-run summaries are built from PR numbers and SHAs, not from
-  attacker-controlled strings.
-- Pin the actions to a full commit SHA in your workflows.
+  metadata only, and never executes code, scripts, or dependencies from the PR
+  under evaluation.
+- Values read from a PR — title, branch name, label text — are treated as
+  untrusted. Check-run summaries are built from PR numbers and commit SHAs, not
+  from attacker-controlled strings.
+- The config file is read from the default branch, never from the PR.
+- Pin these actions to a full commit SHA in your own workflows.
 
 ---
 
@@ -386,17 +384,17 @@ reachable from fork PRs via `workflow_run`. Therefore:
 - **Cross-repository stacks are not supported.** A fork PR is treated as
   standalone and reports its own CI result.
 - Non-native stacking tools (Graphite, `spr`, `ghstack`) are not supported. The
-  topology resolver sits behind a `TopologyProvider` interface, so an adapter is
-  possible without touching the decision logic.
-- A stack with one open member is reported as not-in-stack: with nothing above or
+  resolver sits behind a `TopologyProvider` interface, so an adapter is possible
+  without touching the decision logic.
+- A stack with one open member is reported as not-in-stack. With nothing above or
   below it, there is nothing to mirror, so it runs its own CI.
 - Promoting a PR to checkpoint **temporarily blocks its segment** until that PR
   runs real CI. This is deliberate — the alternative is honouring a verdict it
   never earned — but it is a merge block, so promote before you need to merge.
 - With more than 100 gate runs pending at once, GitHub drops the overflow and
-  those verdicts are not written. Any later event on an affected PR reconciles
-  it, but the check can sit stale until then. If you regularly generate that
-  much PR traffic, split the gate per target branch and accept the narrower
+  those verdicts are not written. Any later event on an affected PR reconciles it,
+  but the check can sit stale until then. If you regularly generate that much PR
+  traffic, split the gate per target branch and accept the narrower
   serialisation.
 - `stack-gate` never restacks or manages branches. `gh stack` owns that.
 - It never runs tests. It decides _whether_ CI should run and _what verdict to
@@ -408,36 +406,36 @@ reachable from fork PRs via `workflow_run`. Therefore:
 
 ```bash
 npm ci
-npm test          # unit + property tests
+npm test          # unit and property tests
 npm run typecheck
 npm run build     # bundles each action into actions/*/dist (committed)
 ```
 
-`src/topology.ts` and `src/verdict.ts` are pure functions over plain data — no
-network — which is what makes the entire decision surface testable from
-fixtures. That is where the real risk lives, and where the property tests point:
-for any stack and any checkpoint placement, every PR belongs to exactly one
+`src/topology.ts` and `src/verdict.ts` are pure functions over plain data, with no
+network access. That is what makes the whole decision surface testable from
+fixtures, and it is where the real risk lives. The property tests point there
+too: for any stack and any checkpoint placement, every PR belongs to exactly one
 segment and has exactly one authority.
 
-The bundles under `actions/*/dist` are committed, because GitHub Actions runs
-them straight from the repository. CI fails if they are out of date.
+The bundles under `actions/*/dist` are committed, because GitHub Actions runs them
+straight from the repository. CI fails if they are out of date.
 
 ### Verifying against a real repository
 
-The decision logic is unit-tested, but the event plumbing is not — that needs a
+The decision logic is unit-tested, but the event plumbing is not. That needs a
 scratch repository with the stacked-PR preview enabled:
 
-1. **Add a head to a stack.** Open a 3-PR stack, let it settle green, push a 4th
-   on top. Every ancestor should refresh to the new head's verdict with no
-   manual action.
-2. **Red head.** Break the head. `#1`–`#3` should go red with `details_url`
+1. **Add a head to a stack.** Open a three-PR stack, let it settle green, then
+   push a fourth on top. Every ancestor should refresh to the new head's verdict
+   with no manual action.
+2. **Red head.** Break the head. `#1` to `#3` should go red, with Details
    pointing at the head's failing run.
 3. **Checkpoint, then partial merge.** Label `#2` as a checkpoint. It should run
    its own CI. With the head still red, `#1` and `#2` should be mergeable.
 4. **Force-push a parent.** Its check should return to `queued`, then settle back
    to the authority's verdict without its own CI running.
-5. **Remove a PR from the stack.** Its check should go to `in_progress` with
+5. **Remove a PR from the stack.** Its check should move to `in_progress` with
    instructions, not stay green.
 
-Run the gate with `dry-run: true` first: the plans are logged without any check
-runs being written.
+Run the gate with `dry-run: true` first: every plan is logged and nothing is
+written.
