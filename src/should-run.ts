@@ -61,18 +61,19 @@ export async function evaluateHatches(
   return { forcedByLabel: false, forcedByPath };
 }
 
+/**
+ * Read a PR's labels off the pull request itself rather than through the issues
+ * endpoint, which would require the `issues: read` permission that nothing else
+ * here needs.
+ */
 async function hasLabel(
   octokit: Octokit,
   repo: Repo,
   prNumber: number,
   label: string,
 ): Promise<boolean> {
-  const labels = await octokit.paginate(octokit.rest.issues.listLabelsOnIssue, {
-    ...repo,
-    issue_number: prNumber,
-    per_page: 100,
-  });
-  return labels.some((l) => l.name === label);
+  const { data } = await octokit.rest.pulls.get({ ...repo, pull_number: prNumber });
+  return data.labels.some((l) => l.name === label);
 }
 
 async function touchesPaths(

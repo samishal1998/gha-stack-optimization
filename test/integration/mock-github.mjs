@@ -32,6 +32,9 @@ export function startMockGitHub(world) {
 
   const prBody = (p) => ({
     number: p.number,
+    // Labels ride along on the pull request, which is how the actions read them
+    // — the issues endpoint would need a permission nothing else here uses.
+    labels: (p.labels ?? []).map((name) => ({ name })),
     state: p.state ?? 'open',
     draft: p.draft ?? false,
     merged: p.merged ?? false,
@@ -146,28 +149,6 @@ export function startMockGitHub(world) {
         });
         state.writes.push({ op: 'update', ...run });
         return json(res, 200, run);
-      }
-
-      // --- issues.listForRepo (checkpoint labels) ------------------------
-      if (path.match(/^\/repos\/[^/]+\/[^/]+\/issues$/) && req.method === 'GET') {
-        const label = q.get('labels');
-        return json(
-          res,
-          200,
-          state.prs
-            .filter((p) => (p.labels ?? []).includes(label))
-            .map((p) => ({ number: p.number, pull_request: { url: 'x' } })),
-        );
-      }
-
-      // --- issues.listLabelsOnIssue (force-run label) --------------------
-      g = m(/^\/repos\/[^/]+\/[^/]+\/issues\/(\d+)\/labels$/);
-      if (g && req.method === 'GET') {
-        return json(
-          res,
-          200,
-          (pr(g[1])?.labels ?? []).map((name) => ({ name })),
-        );
       }
 
       // --- stacks: get ---------------------------------------------------
