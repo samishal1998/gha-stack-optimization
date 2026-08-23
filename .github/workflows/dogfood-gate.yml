@@ -1,0 +1,37 @@
+# Dogfooding: this repository gates its own pull requests, using the reusable
+# workflow exactly as README.md tells consumers to. Nothing here is required by
+# branch protection, so a bug in the gate cannot block this repo's own PRs.
+name: Dogfood Stack Gate
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - converted_to_draft
+      - labeled
+      - unlabeled
+      - closed
+      - stacked
+
+permissions:
+  checks: write
+  pull-requests: read
+  actions: read
+  contents: read
+
+concurrency:
+  group: >-
+    stack-optimization-${{ github.event.workflow_run.head_branch
+    || github.event.pull_request.head.ref
+    || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    uses: samishal1998/gha-stack-optimization/.github/workflows/gate.yml@v1
