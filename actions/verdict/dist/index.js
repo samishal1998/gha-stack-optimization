@@ -29893,16 +29893,17 @@ function computeVerdict(input) {
   const authorityPr = ctx.authorityPr;
   const authorityEstablished = isEstablishedVerdict(authorityCheck);
   const mirrored = authorityEstablished ? toGateConclusion(authorityCheck.conclusion) : null;
+  const targets = trigger === "reconcile" && ctx.segment.length > 0 ? ctx.segment.filter((m) => !m.is_authority) : [{ pr: ctx.pr, sha, is_authority: false }];
   const forcedOwn = trigger === "ci-completed" && forcedRun && own === "failure" ? own : null;
   if (mirrored !== null || forcedOwn !== null) {
     const verdict = mirrored !== null && forcedOwn !== null ? worstOf(mirrored, forcedOwn) : mirrored ?? forcedOwn;
     const decidedByOwn = forcedOwn !== null;
     if (verdict === "failure" && !config.propagateFailures && !decidedByOwn) {
       return {
-        plan: [
-          entry({
-            pr: ctx.pr,
-            sha,
+        plan: targets.map(
+          (target) => entry({
+            pr: target.pr,
+            sha: target.sha,
             conclusion: null,
             reason: "awaiting-authority",
             title: `Waiting on #${authorityPr}`,
@@ -29910,7 +29911,7 @@ function computeVerdict(input) {
             detailsUrl: authorityCheck?.detailsUrl ?? null,
             provenance: holdProvenance(authorityPr, ctx.authoritySha)
           })
-        ],
+        ),
         isAuthoritative: false
       };
     }
@@ -29932,10 +29933,10 @@ function computeVerdict(input) {
       };
     }
     return {
-      plan: [
-        entry({
-          pr: ctx.pr,
-          sha,
+      plan: targets.map(
+        (target) => entry({
+          pr: target.pr,
+          sha: target.sha,
           conclusion: verdict,
           reason: "mirrors-authority",
           title: `Mirrors #${authorityPr} (${VERDICT_WORD[verdict]})`,
@@ -29943,15 +29944,15 @@ function computeVerdict(input) {
           detailsUrl: authorityCheck?.detailsUrl ?? null,
           provenance: mirrorProvenance(authorityPr, ctx.authoritySha)
         })
-      ],
+      ),
       isAuthoritative: false
     };
   }
   return {
-    plan: [
-      entry({
-        pr: ctx.pr,
-        sha,
+    plan: targets.map(
+      (target) => entry({
+        pr: target.pr,
+        sha: target.sha,
         conclusion: null,
         reason: "awaiting-authority",
         title: `Waiting on #${authorityPr}`,
@@ -29959,7 +29960,7 @@ function computeVerdict(input) {
         detailsUrl: null,
         provenance: holdProvenance(authorityPr, ctx.authoritySha)
       })
-    ],
+    ),
     isAuthoritative: false
   };
 }

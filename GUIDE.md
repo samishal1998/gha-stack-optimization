@@ -384,6 +384,13 @@ In the reusable workflow this happens automatically: `conclusion` is wired to
 `github.event.workflow_run.conclusion`, which is empty on a `pull_request_target`
 event, so PR events reconcile and CI completions establish.
 
+The two modes also differ in **how much they rewrite**. A CI completion on a PR
+that is not an authority writes only that PR — the event is about its own run. A
+reconcile rewrites every non-authority PR in the segment, because structure is a
+property of the segment rather than of one PR. Removing a checkpoint is why:
+the demoted PR rejoins the segment above, but so does everything that was below
+it, and nothing else would ever wake those up.
+
 **Inputs.**
 
 | Input | Default | Notes |
