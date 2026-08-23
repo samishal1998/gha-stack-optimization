@@ -420,6 +420,25 @@ export function computeVerdict(input: VerdictInput): VerdictPlan {
   const authorityEstablished = isEstablishedVerdict(authorityCheck);
   const mirrored = authorityEstablished ? toGateConclusion(authorityCheck!.conclusion)! : null;
 
+  /**
+   * Which PRs this event should rewrite.
+   *
+   * A reconcile means something structural changed, and structure is a property
+   * of the whole segment rather than of one PR. Removing a checkpoint is the
+   * case that forces this: the demoted PR rejoins the segment above and picks up
+   * its verdict, but every PR *below* it is still carrying the demoted PR's
+   * verdict, and no other event will wake them up. Planning only for self left
+   * them stale — red, and citing an authority that no longer governs them.
+   *
+   * The authority is excluded: it owns its own verdict and must never be handed
+   * a mirrored one. A CI completion stays self-only, because that event is about
+   * this PR's own run.
+   */
+  const targets: SegmentMember[] =
+    trigger === 'reconcile' && ctx.segment.length > 0
+      ? ctx.segment.filter((m) => !m.is_authority)
+      : [{ pr: ctx.pr, sha, is_authority: false }];
+
   // An escape hatch made this PR run real CI. A failure there is real breakage
   // in an intermediate state, which is the whole point of the hatch, so it is
   // folded in rather than discarded. A pass still cannot stand on its own.
@@ -441,10 +460,10 @@ export function computeVerdict(input: VerdictInput): VerdictPlan {
 
     if (verdict === 'failure' && !config.propagateFailures && !decidedByOwn) {
       return {
-        plan: [
+        plan: targets.map((target) =>
           entry({
-            pr: ctx.pr,
-            sha,
+            pr: target.pr,
+            sha: target.sha,
             conclusion: null,
             reason: 'awaiting-authority',
             title: `Waiting on #${authorityPr}`,
@@ -454,7 +473,7 @@ export function computeVerdict(input: VerdictInput): VerdictPlan {
             detailsUrl: authorityCheck?.detailsUrl ?? null,
             provenance: holdProvenance(authorityPr, ctx.authoritySha),
           }),
-        ],
+        ),
         isAuthoritative: false,
       };
     }
@@ -482,10 +501,10 @@ export function computeVerdict(input: VerdictInput): VerdictPlan {
     }
 
     return {
-      plan: [
+      plan: targets.map((target) =>
         entry({
-          pr: ctx.pr,
-          sha,
+          pr: target.pr,
+          sha: target.sha,
           conclusion: verdict,
           reason: 'mirrors-authority',
           title: `Mirrors #${authorityPr} (${VERDICT_WORD[verdict]})`,
@@ -497,17 +516,17 @@ export function computeVerdict(input: VerdictInput): VerdictPlan {
           detailsUrl: authorityCheck?.detailsUrl ?? null,
           provenance: mirrorProvenance(authorityPr, ctx.authoritySha),
         }),
-      ],
+      ),
       isAuthoritative: false,
     };
   }
 
   // The authority has nothing established yet. Hold.
   return {
-    plan: [
+    plan: targets.map((target) =>
       entry({
-        pr: ctx.pr,
-        sha,
+        pr: target.pr,
+        sha: target.sha,
         conclusion: null,
         reason: 'awaiting-authority',
         title: `Waiting on #${authorityPr}`,
@@ -517,7 +536,7 @@ export function computeVerdict(input: VerdictInput): VerdictPlan {
         detailsUrl: null,
         provenance: holdProvenance(authorityPr, ctx.authoritySha),
       }),
-    ],
+    ),
     isAuthoritative: false,
   };
 }

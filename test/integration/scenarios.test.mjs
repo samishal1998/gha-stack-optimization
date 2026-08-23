@@ -669,6 +669,65 @@ scenario('22. A workflow run with no pull request behind it is not an error');
 }
 
 // ===========================================================================
+scenario('23. Removing a checkpoint re-derives everything below it, not just itself');
+{
+  // The asymmetry this covers: promoting a PR makes it an authority, so it plans
+  // for its whole new segment. Demoting it makes it a non-authority, which used
+  // to plan only for itself — leaving every PR below still carrying the demoted
+  // PR's verdict, red, and naming an authority that no longer governed them.
+  const mock = await startMockGitHub({
+    prs: [1, 2, 3, 4, 5].map((n) => ({
+      number: n,
+      sha: `sha${n}`,
+      labels: n === 3 ? ['stack-checkpoint'] : [],
+    })),
+    stack: { number: 7, base: 'main', members: [1, 2, 3, 4, 5] },
+    checkRuns: [],
+    configYml: null,
+  });
+
+  await gate(mock, { pr: 5, conclusion: 'success' });
+  await gate(mock, { pr: 3, conclusion: 'failure' });
+  check('two segments, opposite verdicts', ['sha5', 'sha4', 'sha3', 'sha2', 'sha1'].map(
+    (s) => checkOn(mock.state, s)?.conclusion),
+    ['success', 'success', 'failure', 'failure', 'failure']);
+
+  // The label comes off. Only #3 gets an event.
+  mock.state.prs.find((p) => p.number === 3).labels = [];
+  const { verdict } = await gate(mock, { pr: 3, conclusion: undefined });
+
+  check('the plan covers every non-authority below the head',
+    JSON.parse(verdict.outputs.plan).map((e) => e.pr).sort((a, b) => b - a), [4, 3, 2, 1]);
+  check('and leaves the authority alone',
+    JSON.parse(verdict.outputs.plan).some((e) => e.pr === 5), false);
+  check('the whole stack converges on #5', ['sha5', 'sha4', 'sha3', 'sha2', 'sha1'].map(
+    (s) => checkOn(mock.state, s)?.conclusion),
+    ['success', 'success', 'success', 'success', 'success']);
+  check('#1 now names #5 as its authority', provenanceOf(checkOn(mock.state, 'sha1'))?.auth, 5);
+  check('#5 still owns its own verdict', provenanceOf(checkOn(mock.state, 'sha5'))?.src, 'own-ci');
+  await mock.close();
+}
+
+// ===========================================================================
+scenario('24. A CI completion on a non-authority still writes only itself');
+{
+  // The segment-wide rewrite is for reconciles. A forced run reports its own
+  // result and must not smear that across PRs it does not govern.
+  const mock = await startMockGitHub(stackOf(4, { 2: { files: ['migrations/1.sql'] } }));
+  await gate(mock, { pr: 4, conclusion: 'success' });
+  const { verdict } = await gate(mock, {
+    pr: 2,
+    conclusion: 'failure',
+    inputs: { 'always-run-paths': 'migrations/**' },
+  });
+  check('only #2', JSON.parse(verdict.outputs.plan).map((e) => e.pr), [2]);
+  check('#2 red on its own run', checkOn(mock.state, 'sha2')?.conclusion, 'failure');
+  check('#1 untouched', checkOn(mock.state, 'sha1')?.conclusion, 'success');
+  check('#3 untouched', checkOn(mock.state, 'sha3')?.conclusion, 'success');
+  await mock.close();
+}
+
+// ===========================================================================
 const failed = results.filter((r) => !r.ok);
 const scenarios = new Set(results.map((r) => r.scenario));
 console.log(
