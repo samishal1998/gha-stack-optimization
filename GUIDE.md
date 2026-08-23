@@ -257,7 +257,7 @@ jobs:
       position: ${{ steps.ctx.outputs.position }}
       size: ${{ steps.ctx.outputs.size }}
     steps:
-      - uses: samishal1998/stack-optimization/actions/context@v1
+      - uses: samishal1998/gha-stack-optimization/actions/context@v1
         id: ctx
 
   e2e:
@@ -335,7 +335,7 @@ jobs:
       should-run: ${{ steps.d.outputs.should-run }}
       reason: ${{ steps.d.outputs.reason }}
     steps:
-      - uses: samishal1998/stack-optimization/actions/should-run@v1
+      - uses: samishal1998/gha-stack-optimization/actions/should-run@v1
         id: d
 
   test:
@@ -432,7 +432,7 @@ holds at `in_progress` rather than reporting anything.
 **Example: inspect the plan before applying it.**
 
 ```yaml
-- uses: samishal1998/stack-optimization/actions/verdict@v1
+- uses: samishal1998/gha-stack-optimization/actions/verdict@v1
   id: v
   with:
     conclusion: ${{ github.event.workflow_run.conclusion }}
@@ -441,7 +441,7 @@ holds at `in_progress` rather than reporting anything.
 - name: Show the plan
   run: echo '${{ steps.v.outputs.plan }}' | jq .
 
-- uses: samishal1998/stack-optimization/actions/propagate@v1
+- uses: samishal1998/gha-stack-optimization/actions/propagate@v1
   if: steps.v.outputs.affected-count != '0'
   with:
     plan: ${{ steps.v.outputs.plan }}
@@ -502,7 +502,7 @@ nothing written:
 ```yaml
 jobs:
   gate:
-    uses: samishal1998/stack-optimization/.github/workflows/gate.yml@v1
+    uses: samishal1998/gha-stack-optimization/.github/workflows/gate.yml@v1
     with:
       dry-run: true
 ```
@@ -568,7 +568,7 @@ jobs:
       pull-requests: read
       contents: read
     steps:
-      - uses: samishal1998/stack-optimization/actions/seed@v1
+      - uses: samishal1998/gha-stack-optimization/actions/seed@v1
 ```
 
 This runs in a few seconds and can sit alongside your gating job.
@@ -598,7 +598,7 @@ stacks and does not need to.
 | `summary` | none | Output summary, markdown |
 | `text` | none | Extended output detail, markdown |
 | `details-url` | none | Where the check's "Details" link goes |
-| `external-id` | provenance marker | Your own correlation id. See below. |
+| `external-id` | not written | Your own correlation id. See below. |
 
 **Outputs.**
 
@@ -616,17 +616,23 @@ updates one check run rather than accumulating duplicates.
 conclusion, or a conclusion outside the allowed set, fails immediately with a
 message naming the problem rather than producing an opaque API error.
 
-*About `external-id`.* The gate normally writes a provenance marker here,
-recording whether a verdict was earned by this commit's own CI or mirrored from an
-authority. When you use `post-check` standalone, you own this field, and setting it
-replaces the marker. That is the right behaviour for standalone use, but do not
-set it on a check that the gate also manages, or the gate will read the check as
-having unknown provenance and refuse to treat it as an established verdict.
+*About `external-id`.* `post-check` never writes the gate's provenance marker —
+it is a general-purpose primitive, and stamping a stack-specific marker onto an
+unrelated check would be wrong. If you pass `external-id`, that value is used; if
+you do not, the field is left alone entirely, so a correlation id you set on the
+first call survives later updates.
+
+The consequence to be aware of: because `post-check` writes no provenance, a
+check it creates under the **gate's own check name** reads as unknown provenance,
+and the gate will not treat it as an established verdict. That is the safe
+direction — it holds rather than trusting a marker it cannot parse — but it means
+you should not hand-write the gate's check with this action and expect the gate to
+honour it.
 
 **Example: report an external system's result as a check.**
 
 ```yaml
-- uses: samishal1998/stack-optimization/actions/post-check@v1
+- uses: samishal1998/gha-stack-optimization/actions/post-check@v1
   with:
     name: security-scan
     sha: ${{ github.event.pull_request.head.sha }}
@@ -788,10 +794,10 @@ jobs:
       github.event.workflow_run.conclusion != 'cancelled'
     runs-on: ubuntu-latest
     steps:
-      - uses: samishal1998/stack-optimization/actions/context@v1
+      - uses: samishal1998/gha-stack-optimization/actions/context@v1
         id: context
 
-      - uses: samishal1998/stack-optimization/actions/verdict@v1
+      - uses: samishal1998/gha-stack-optimization/actions/verdict@v1
         id: verdict
         with:
           context: ${{ steps.context.outputs.context }}
@@ -803,7 +809,7 @@ jobs:
         if: steps.verdict.outputs.is-authoritative == 'true'
         run: ./scripts/notify.sh '${{ steps.verdict.outputs.plan }}'
 
-      - uses: samishal1998/stack-optimization/actions/propagate@v1
+      - uses: samishal1998/gha-stack-optimization/actions/propagate@v1
         if: steps.verdict.outputs.affected-count != '0'
         with:
           plan: ${{ steps.verdict.outputs.plan }}
@@ -852,7 +858,7 @@ overrides the file:
 ```yaml
 jobs:
   gate:
-    uses: samishal1998/stack-optimization/.github/workflows/gate.yml@v1
+    uses: samishal1998/gha-stack-optimization/.github/workflows/gate.yml@v1
     with:
       check-name: ci-gate
 ```

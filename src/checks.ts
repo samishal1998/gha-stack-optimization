@@ -47,10 +47,17 @@ export class ChecksClient {
     private readonly repo: Repo,
     private readonly checkName: string,
     /**
-     * Overrides the provenance marker in `external_id`. Set when a caller uses
-     * `post-check` standalone and owns the correlation id itself.
+     * What to write into `external_id`:
+     *
+     *   undefined  the gate's provenance marker, derived from the plan entry
+     *   a string   the caller's own correlation id
+     *   null       nothing at all, leaving any existing value untouched
+     *
+     * `post-check` passes a string or null, because it is a general-purpose
+     * primitive: stamping a stack-specific marker onto an unrelated check would
+     * be wrong, and would later be misread as a verdict of unknown provenance.
      */
-    private readonly externalIdOverride?: string | undefined,
+    private readonly externalId?: string | null,
   ) {}
 
   /** The gate check currently on `sha`, or null if there isn't one. */
@@ -84,11 +91,15 @@ export class ChecksClient {
    */
   async write(entry: PlanEntry, text?: string): Promise<{ id: number; created: boolean }> {
     const existing = await this.read(entry.sha);
+    const externalId =
+      this.externalId === undefined ? encodeProvenance(entry.provenance) : this.externalId;
     const body = {
       ...this.repo,
       name: this.checkName,
       status: entry.status,
-      external_id: this.externalIdOverride ?? encodeProvenance(entry.provenance),
+      // Omitted rather than nulled: a PATCH leaves an unspecified field alone,
+      // so a standalone caller's correlation id survives an update.
+      ...(externalId === null ? {} : { external_id: externalId }),
       output: {
         title: entry.title,
         summary: entry.summary,

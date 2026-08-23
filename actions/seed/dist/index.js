@@ -20141,16 +20141,16 @@ function decodeProvenance(externalId) {
   }
 }
 var ChecksClient = class {
-  constructor(octokit, repo, checkName, externalIdOverride) {
+  constructor(octokit, repo, checkName, externalId) {
     this.octokit = octokit;
     this.repo = repo;
     this.checkName = checkName;
-    this.externalIdOverride = externalIdOverride;
+    this.externalId = externalId;
   }
   octokit;
   repo;
   checkName;
-  externalIdOverride;
+  externalId;
   /** The gate check currently on `sha`, or null if there isn't one. */
   async read(sha) {
     const { data } = await this.octokit.rest.checks.listForRef({
@@ -20180,11 +20180,14 @@ var ChecksClient = class {
    */
   async write(entry, text) {
     const existing = await this.read(entry.sha);
+    const externalId = this.externalId === void 0 ? encodeProvenance(entry.provenance) : this.externalId;
     const body = {
       ...this.repo,
       name: this.checkName,
       status: entry.status,
-      external_id: this.externalIdOverride ?? encodeProvenance(entry.provenance),
+      // Omitted rather than nulled: a PATCH leaves an unspecified field alone,
+      // so a standalone caller's correlation id survives an update.
+      ...externalId === null ? {} : { external_id: externalId },
       output: {
         title: entry.title,
         summary: entry.summary,

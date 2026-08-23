@@ -192,6 +192,24 @@ describe('ChecksClient.write', () => {
     expect(calls.create[0]).toMatchObject({ external_id: 'my-own-id' });
   });
 
+  it('omits external_id entirely when passed null', async () => {
+    // `post-check` is a general primitive. Stamping a stack-specific provenance
+    // marker onto an unrelated check would later be misread as a verdict of
+    // unknown provenance.
+    const { octokit, calls } = fakeOctokit({});
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization', null);
+    await client.write(entry());
+    expect(calls.create[0]).not.toHaveProperty('external_id');
+  });
+
+  it('leaves an existing external_id untouched when omitting it', async () => {
+    const { octokit, calls } = fakeOctokit({ existing: [run({ id: 55, external_id: 'theirs' })] });
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization', null);
+    await client.write(entry());
+    expect(calls.update[0]).toMatchObject({ check_run_id: 55 });
+    expect(calls.update[0]).not.toHaveProperty('external_id');
+  });
+
   it('falls back to creating when the existing check belongs to another app', async () => {
     // A check run can only be PATCHed by the app that created it, so switching
     // the `token` input to a bot identity makes the update 403.

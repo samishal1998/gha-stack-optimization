@@ -136,7 +136,7 @@ jobs:
     outputs:
       should-run: ${{ steps.d.outputs.should-run }}
     steps:
-      - uses: samishal1998/stack-optimization/actions/should-run@v1
+      - uses: samishal1998/gha-stack-optimization/actions/should-run@v1
         id: d
 
   test:
@@ -186,7 +186,7 @@ concurrency:
 
 jobs:
   gate:
-    uses: samishal1998/stack-optimization/.github/workflows/gate.yml@v1
+    uses: samishal1998/gha-stack-optimization/.github/workflows/gate.yml@v1
     with:
       check-name: stack-optimization
       checkpoint-label: stack-checkpoint
