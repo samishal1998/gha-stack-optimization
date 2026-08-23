@@ -1,6 +1,6 @@
-name: 'stack-gate: context'
+name: 'stack-optimization: context'
 description: 'Resolve stacked-PR topology: authorities, segments and mirroring relationships. Pure read.'
-author: 'stack-gate'
+author: 'stack-optimization'
 
 inputs:
   token:
@@ -19,7 +19,7 @@ inputs:
   config-path:
     description: 'Path to the repository config file, read from the default branch.'
     required: false
-    default: '.github/stack-gate.yml'
+    default: '.github/stack-optimization.yml'
 
 outputs:
   in-stack:
@@ -57,7 +57,7 @@ outputs:
   stack:
     description: 'JSON list of the full open topology, root to head.'
   context:
-    description: 'The complete resolved context as JSON, for passing to other stack-gate actions.'
+    description: 'The complete resolved context as JSON, for passing to other stack-optimization actions.'
 
 runs:
   using: node24

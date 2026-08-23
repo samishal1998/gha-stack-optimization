@@ -1,5 +1,5 @@
 /**
- * `stack-gate/seed` — guarantee the required check exists.
+ * `stack-optimization/seed` — guarantee the required check exists.
  *
  * A missing required check is the one state that hard-blocks a merge with no
  * way out, so this runs on every PR event that can change a head SHA and posts

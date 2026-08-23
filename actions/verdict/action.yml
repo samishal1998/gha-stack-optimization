@@ -1,6 +1,6 @@
-name: 'stack-gate: verdict'
+name: 'stack-optimization: verdict'
 description: 'Compute which check runs should be posted where. Writes nothing.'
-author: 'stack-gate'
+author: 'stack-optimization'
 
 inputs:
   token:
@@ -8,7 +8,7 @@ inputs:
     required: false
     default: ${{ github.token }}
   context:
-    description: 'A context JSON from `stack-gate/context`. Resolved internally when omitted.'
+    description: 'A context JSON from `stack-optimization/context`. Resolved internally when omitted.'
     required: false
   pr-number:
     description: 'Pull request to judge. Inferred from the event when omitted.'
@@ -37,7 +37,7 @@ inputs:
   config-path:
     description: 'Path to the repository config file, read from the default branch.'
     required: false
-    default: '.github/stack-gate.yml'
+    default: '.github/stack-optimization.yml'
 
 outputs:
   plan:

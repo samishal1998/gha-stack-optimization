@@ -1,4 +1,4 @@
-/** `stack-gate/post-check` — the low-level idempotent check-run primitive. */
+/** `stack-optimization/post-check` — the low-level idempotent check-run primitive. */
 import * as core from '@actions/core';
 import { ChecksClient, withRetry } from '../checks.js';
 import { fail, getRepo, makeOctokit, optionalString } from '../github.js';

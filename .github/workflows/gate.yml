@@ -1,15 +1,9 @@
 # The batteries-included consumer path: wires context -> verdict -> propagate.
 #
-# ┌──────────────────────────────────────────────────────────────────────────┐
-# │ BEFORE PUBLISHING: replace `your-org` below with the owner of this        │
-# │ repository. A reusable workflow cannot interpolate its own repository     │
-# │ into a `uses:` reference, so the three action references are hardcoded.   │
-# │                                                                          │
-# │   sed -i 's|your-org/stack-gate|ACTUAL-OWNER/stack-gate|g' \              │
-# │     .github/workflows/gate.yml README.md GUIDE.md                        │
-# │                                                                          │
-# │ Check nothing was missed:  grep -rn your-org .                           │
-# └──────────────────────────────────────────────────────────────────────────┘
+# The three action references below are hardcoded to this repository, because a
+# reusable workflow cannot interpolate its own repository into a `uses:`
+# reference. If this repo is ever renamed or forked, they need updating here and
+# in README.md and GUIDE.md.
 #
 # Two entry points, one pipeline:
 #
@@ -25,22 +19,22 @@
 # Security: this workflow runs in the base-repo context with a write-capable
 # token and is reachable from fork PRs. It never checks out or executes any code
 # from the pull request under evaluation — it reads metadata only.
-name: Stack Gate
+name: Stack Optimization Gate
 
 on:
   workflow_call:
     # These inputs deliberately carry NO defaults. An action input always beats
     # the repository config file, so a default here would be forwarded as a real
-    # value and would silently override `.github/stack-gate.yml`. For check-name
-    # that is catastrophic: the gate would write `stack-gate` while branch
-    # protection waited for the configured name, blocking every PR forever.
+    # value and would silently override the config file. For check-name that is
+    # catastrophic: the gate would write the default name while branch
+    # protection waited for the configured one, blocking every PR forever.
+    #
     # Left unset, these arrive as empty strings, which the actions treat as
-    # absent — so the config file is honoured, and the built-in defaults
-    # (stack-gate, stack-checkpoint, .github/stack-gate.yml) apply if there is
-    # no config file.
+    # absent. The config file is then honoured, and the built-in defaults apply
+    # when there is no config file.
     inputs:
       check-name:
-        description: 'Gate check run name. This is the name branch protection requires. Overrides the config file. Default: stack-gate.'
+        description: 'Gate check run name. This is the name branch protection requires. Overrides the config file. Default: stack-optimization.'
         type: string
         required: false
       checkpoint-label:
@@ -48,7 +42,7 @@ on:
         type: string
         required: false
       config-path:
-        description: 'Repository config file, read from the default branch. Default: .github/stack-gate.yml.'
+        description: 'Repository config file, read from the default branch. Default: .github/stack-optimization.yml.'
         type: string
         required: false
       dry-run:
@@ -77,7 +71,7 @@ jobs:
     steps:
       - name: Resolve stack topology
         id: context
-        uses: your-org/stack-gate/actions/context@v1
+        uses: samishal1998/stack-optimization/actions/context@v1
         with:
           token: ${{ secrets.token || github.token }}
           checkpoint-label: ${{ inputs.checkpoint-label }}
@@ -85,7 +79,7 @@ jobs:
 
       - name: Compute verdict plan
         id: verdict
-        uses: your-org/stack-gate/actions/verdict@v1
+        uses: samishal1998/stack-optimization/actions/verdict@v1
         with:
           token: ${{ secrets.token || github.token }}
           context: ${{ steps.context.outputs.context }}
@@ -98,7 +92,7 @@ jobs:
 
       - name: Post check runs
         if: steps.verdict.outputs.affected-count != '0'
-        uses: your-org/stack-gate/actions/propagate@v1
+        uses: samishal1998/stack-optimization/actions/propagate@v1
         with:
           token: ${{ secrets.token || github.token }}
           plan: ${{ steps.verdict.outputs.plan }}

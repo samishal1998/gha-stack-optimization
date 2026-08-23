@@ -1,4 +1,4 @@
-# stack-gate guide
+# stack-optimization guide
 
 This guide covers every action in the suite: what each one is for, when you would
 reach for it, and how to wire it up. If you just want the thing working, the
@@ -203,7 +203,7 @@ so you rarely need this on its own. Two cases where you do:
 | `pr-number` | inferred from the event | Set this when the event is not a PR event |
 | `checkpoint-label` | `stack-checkpoint` | Overrides the config file |
 | `skip-draft-head` | `true` | Overrides the config file |
-| `config-path` | `.github/stack-gate.yml` | Read from the default branch |
+| `config-path` | `.github/stack-optimization.yml` | Read from the default branch |
 
 **Outputs.**
 
@@ -257,7 +257,7 @@ jobs:
       position: ${{ steps.ctx.outputs.position }}
       size: ${{ steps.ctx.outputs.size }}
     steps:
-      - uses: your-org/stack-gate/actions/context@v1
+      - uses: samishal1998/stack-optimization/actions/context@v1
         id: ctx
 
   e2e:
@@ -298,7 +298,7 @@ depend on, so a skipped PR costs one short job instead of a full suite.
 | `force-run-label` | `stack-ci-force` | Overrides the config file |
 | `always-run-paths` | none | Newline- or comma-separated globs |
 | `skip-draft-head` | `true` | Overrides the config file |
-| `config-path` | `.github/stack-gate.yml` | Read from the default branch |
+| `config-path` | `.github/stack-optimization.yml` | Read from the default branch |
 
 **Outputs.**
 
@@ -335,7 +335,7 @@ jobs:
       should-run: ${{ steps.d.outputs.should-run }}
       reason: ${{ steps.d.outputs.reason }}
     steps:
-      - uses: your-org/stack-gate/actions/should-run@v1
+      - uses: samishal1998/stack-optimization/actions/should-run@v1
         id: d
 
   test:
@@ -394,11 +394,11 @@ event, so PR events reconcile and CI completions establish.
 | `conclusion` | none | The completing CI run's conclusion. **Omit to reconcile.** |
 | `run-id` | none | The completing run's id. Logged, for correlation. |
 | `run-url` | none | The completing run's `html_url`. Becomes `details_url`. |
-| `check-name` | `stack-gate` | Overrides the config file |
+| `check-name` | `stack-optimization` | Overrides the config file |
 | `checkpoint-label` | `stack-checkpoint` | Overrides the config file |
 | `propagate-failures` | `true` | Overrides the config file |
 | `skip-draft-head` | `true` | Overrides the config file |
-| `config-path` | `.github/stack-gate.yml` | Read from the default branch |
+| `config-path` | `.github/stack-optimization.yml` | Read from the default branch |
 
 **Outputs.**
 
@@ -432,7 +432,7 @@ holds at `in_progress` rather than reporting anything.
 **Example: inspect the plan before applying it.**
 
 ```yaml
-- uses: your-org/stack-gate/actions/verdict@v1
+- uses: samishal1998/stack-optimization/actions/verdict@v1
   id: v
   with:
     conclusion: ${{ github.event.workflow_run.conclusion }}
@@ -441,7 +441,7 @@ holds at `in_progress` rather than reporting anything.
 - name: Show the plan
   run: echo '${{ steps.v.outputs.plan }}' | jq .
 
-- uses: your-org/stack-gate/actions/propagate@v1
+- uses: samishal1998/stack-optimization/actions/propagate@v1
   if: steps.v.outputs.affected-count != '0'
   with:
     plan: ${{ steps.v.outputs.plan }}
@@ -464,7 +464,7 @@ so that computing and writing can be tested, logged, and dry-run independently.
 |---|---|---|
 | `token` | `${{ github.token }}` | Needs `checks: write` and `pull-requests: read` |
 | `plan` | **required** | The `plan` output from `verdict` |
-| `check-name` | `stack-gate` | **Does not read the config file.** Pass `verdict`'s `check-name` output. |
+| `check-name` | `stack-optimization` | **Does not read the config file.** Pass `verdict`'s `check-name` output. |
 | `dry-run` | `false` | Log every write without performing it |
 | `max-concurrency` | `4` | Concurrent check-run writes |
 
@@ -502,12 +502,12 @@ nothing written:
 ```yaml
 jobs:
   gate:
-    uses: your-org/stack-gate/.github/workflows/gate.yml@v1
+    uses: samishal1998/stack-optimization/.github/workflows/gate.yml@v1
     with:
       dry-run: true
 ```
 
-Do this first, on a real stack, before you make `stack-gate` a required check.
+Do this first, on a real stack, before you make `stack-optimization` a required check.
 
 ---
 
@@ -535,10 +535,10 @@ this, so if you use `gate.yml` you do not need `seed`. Reach for it if:
 | `token` | `${{ github.token }}` | Needs `checks: write`, `pull-requests: read`, `contents: read` |
 | `context` | resolved internally | Pass `context`'s output to avoid resolving twice |
 | `pr-number` | inferred from the event | |
-| `check-name` | `stack-gate` | Overrides the config file |
+| `check-name` | `stack-optimization` | Overrides the config file |
 | `checkpoint-label` | `stack-checkpoint` | Overrides the config file |
 | `skip-draft-head` | `true` | Overrides the config file |
-| `config-path` | `.github/stack-gate.yml` | Read from the default branch |
+| `config-path` | `.github/stack-optimization.yml` | Read from the default branch |
 
 **Outputs.**
 
@@ -568,7 +568,7 @@ jobs:
       pull-requests: read
       contents: read
     steps:
-      - uses: your-org/stack-gate/actions/seed@v1
+      - uses: samishal1998/stack-optimization/actions/seed@v1
 ```
 
 This runs in a few seconds and can sit alongside your gating job.
@@ -590,7 +590,7 @@ stacks and does not need to.
 | Input | Default | Notes |
 |---|---|---|
 | `token` | `${{ github.token }}` | Needs `checks: write` |
-| `name` | `stack-gate` | The check run name. This is the name branch protection requires. |
+| `name` | `stack-optimization` | The check run name. This is the name branch protection requires. |
 | `sha` | **required** | The commit to write to |
 | `status` | `completed` | `queued`, `in_progress`, or `completed` |
 | `conclusion` | none | `success`, `failure`, or `neutral`. Required when `status: completed`. |
@@ -626,7 +626,7 @@ having unknown provenance and refuse to treat it as an established verdict.
 **Example: report an external system's result as a check.**
 
 ```yaml
-- uses: your-org/stack-gate/actions/post-check@v1
+- uses: samishal1998/stack-optimization/actions/post-check@v1
   with:
     name: security-scan
     sha: ${{ github.event.pull_request.head.sha }}
@@ -649,10 +649,10 @@ pull request being evaluated. This is deliberate: a fork PR must not be able to
 reconfigure the gate that judges it.
 
 ```yaml
-# .github/stack-gate.yml
+# .github/stack-optimization.yml
 
 # The check run name. This is what you require in branch protection.
-check-name: stack-gate
+check-name: stack-optimization
 
 # Label that makes a PR a checkpoint: an authority that owns its own verdict.
 checkpoint-label: stack-checkpoint
@@ -751,7 +751,7 @@ If you want to insert your own steps into the gate, skip the reusable workflow a
 compose the three actions. This is equivalent to what `gate.yml` does:
 
 ```yaml
-name: Stack Gate
+name: Stack Optimization Gate
 on:
   workflow_run:
     workflows: ['CI']
@@ -777,7 +777,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: stack-gate
+  group: stack-optimization
   cancel-in-progress: false
   queue: max
 
@@ -788,10 +788,10 @@ jobs:
       github.event.workflow_run.conclusion != 'cancelled'
     runs-on: ubuntu-latest
     steps:
-      - uses: your-org/stack-gate/actions/context@v1
+      - uses: samishal1998/stack-optimization/actions/context@v1
         id: context
 
-      - uses: your-org/stack-gate/actions/verdict@v1
+      - uses: samishal1998/stack-optimization/actions/verdict@v1
         id: verdict
         with:
           context: ${{ steps.context.outputs.context }}
@@ -803,7 +803,7 @@ jobs:
         if: steps.verdict.outputs.is-authoritative == 'true'
         run: ./scripts/notify.sh '${{ steps.verdict.outputs.plan }}'
 
-      - uses: your-org/stack-gate/actions/propagate@v1
+      - uses: samishal1998/stack-optimization/actions/propagate@v1
         if: steps.verdict.outputs.affected-count != '0'
         with:
           plan: ${{ steps.verdict.outputs.plan }}
@@ -836,7 +836,7 @@ together, aggregate them into one workflow instead.
 Set it once in the config file and let it flow:
 
 ```yaml
-# .github/stack-gate.yml
+# .github/stack-optimization.yml
 check-name: ci-gate
 ```
 
@@ -844,7 +844,7 @@ Then require `ci-gate` in branch protection. The reusable workflow picks this up
 **leave its `check-name` input unset** and the config file wins. This is why
 `gate.yml`'s inputs deliberately carry no defaults — a default would be forwarded
 as a real value, and an action input always beats the config file, so the gate
-would write `stack-gate` while branch protection waited for `ci-gate`.
+would write `stack-optimization` while branch protection waited for `ci-gate`.
 
 If you would rather set it as an input, set it on the reusable workflow, and it
 overrides the file:
@@ -852,7 +852,7 @@ overrides the file:
 ```yaml
 jobs:
   gate:
-    uses: your-org/stack-gate/.github/workflows/gate.yml@v1
+    uses: samishal1998/stack-optimization/.github/workflows/gate.yml@v1
     with:
       check-name: ci-gate
 ```
@@ -896,7 +896,7 @@ In every one of these, the gate is refusing to report a verdict it cannot
 justify. Holding is the deliberate choice: the alternative is reporting a pass
 that nothing earned.
 
-### A PR has no `stack-gate` check at all
+### A PR has no `stack-optimization` check at all
 
 The gate has never run for that commit. Usual causes:
 
@@ -906,14 +906,14 @@ The gate has never run for that commit. Usual causes:
   filename.
 - **The gate workflow file is not on your default branch.** `pull_request_target`
   and `workflow_run` both read the workflow file from the default branch only.
-- **The gate run failed.** Check the Actions tab for a failed "Stack Gate" run.
+- **The gate run failed.** Check the Actions tab for a failed "Stack Optimization Gate" run.
 - **The gate run was dropped by the concurrency queue**, which needs more than
   100 pending runs. Any subsequent event on the PR reconciles it.
 
 Adding `seed` to your CI workflow closes the timing gap, because it posts the
 check within seconds of the push rather than after CI finishes.
 
-### Two `stack-gate` checks on the same PR
+### Two `stack-optimization` checks on the same PR
 
 You changed the `token` identity. A check run can only be updated by the app that
 created it, so the gate could not update the check it wrote under the old identity

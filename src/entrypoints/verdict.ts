@@ -1,5 +1,5 @@
 /**
- * `stack-gate/verdict` — compute what should be reported, writing nothing.
+ * `stack-optimization/verdict` — compute what should be reported, writing nothing.
  *
  * Splitting computation from mutation is what makes the decision surface
  * testable and gives `propagate` a dry-run mode worth having.

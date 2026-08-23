@@ -1,6 +1,6 @@
-name: 'stack-gate: propagate'
+name: 'stack-optimization: propagate'
 description: 'Execute a verdict plan, writing the gate check across the affected PRs.'
-author: 'stack-gate'
+author: 'stack-optimization'
 
 inputs:
   token:
@@ -8,12 +8,12 @@ inputs:
     required: false
     default: ${{ github.token }}
   plan:
-    description: 'A plan JSON from `stack-gate/verdict`.'
+    description: 'A plan JSON from `stack-optimization/verdict`.'
     required: true
   check-name:
     description: 'Gate check run name.'
     required: false
-    default: 'stack-gate'
+    default: 'stack-optimization'
   dry-run:
     description: 'Log what would be written without writing it.'
     required: false

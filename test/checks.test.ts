@@ -89,14 +89,14 @@ describe('provenance encoding', () => {
     expect(decodeProvenance(undefined)).toBeNull();
     expect(decodeProvenance('')).toBeNull();
     expect(decodeProvenance('some-other-tool-id')).toBeNull();
-    expect(decodeProvenance('stack-gate:not json')).toBeNull();
-    expect(decodeProvenance('stack-gate:{"v":2,"src":"own-ci"}')).toBeNull();
-    expect(decodeProvenance('stack-gate:{"v":1,"src":"bogus"}')).toBeNull();
-    expect(decodeProvenance('stack-gate:null')).toBeNull();
+    expect(decodeProvenance('stack-optimization:not json')).toBeNull();
+    expect(decodeProvenance('stack-optimization:{"v":2,"src":"own-ci"}')).toBeNull();
+    expect(decodeProvenance('stack-optimization:{"v":1,"src":"bogus"}')).toBeNull();
+    expect(decodeProvenance('stack-optimization:null')).toBeNull();
   });
 
   it('normalises missing fields rather than trusting them', () => {
-    const p = decodeProvenance('stack-gate:{"v":1,"src":"own-ci"}');
+    const p = decodeProvenance('stack-optimization:{"v":1,"src":"own-ci"}');
     expect(p).toEqual({ v: 1, src: 'own-ci', auth: null, authSha: null, forced: false });
   });
 
@@ -109,7 +109,7 @@ describe('provenance encoding', () => {
 describe('ChecksClient.read', () => {
   it('returns null when the SHA has no gate check', async () => {
     const { octokit } = fakeOctokit({});
-    const client = new ChecksClient(octokit, REPO, 'stack-gate');
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization');
     expect(await client.read('c'.repeat(40))).toBeNull();
   });
 
@@ -127,7 +127,7 @@ describe('ChecksClient.read', () => {
         run({ id: 2, started_at: '2026-08-02T00:00:00Z', conclusion: 'success' }),
       ],
     });
-    const client = new ChecksClient(octokit, REPO, 'stack-gate');
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization');
     const state = await client.read('c'.repeat(40));
     expect(state?.id).toBe(2);
     expect(state?.conclusion).toBe('success');
@@ -137,7 +137,7 @@ describe('ChecksClient.read', () => {
     const { octokit } = fakeOctokit({
       existing: [run({ external_id: encodeProvenance(provenance({ src: 'mirror', auth: 6 })) })],
     });
-    const client = new ChecksClient(octokit, REPO, 'stack-gate');
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization');
     const state = await client.read('c'.repeat(40));
     expect(state?.provenance?.src).toBe('mirror');
     expect(state?.provenance?.auth).toBe(6);
@@ -147,13 +147,13 @@ describe('ChecksClient.read', () => {
 describe('ChecksClient.write', () => {
   it('creates a check when the SHA has none', async () => {
     const { octokit, calls } = fakeOctokit({});
-    const client = new ChecksClient(octokit, REPO, 'stack-gate');
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization');
     const result = await client.write(entry());
     expect(result).toEqual({ id: 999, created: true });
     expect(calls.create).toHaveLength(1);
     expect(calls.update).toHaveLength(0);
     expect(calls.create[0]).toMatchObject({
-      name: 'stack-gate',
+      name: 'stack-optimization',
       head_sha: 'b'.repeat(40),
       status: 'completed',
       conclusion: 'success',
@@ -162,7 +162,7 @@ describe('ChecksClient.write', () => {
 
   it('updates in place so re-propagation leaves one check, not ten', async () => {
     const { octokit, calls } = fakeOctokit({ existing: [run({ id: 77 })] });
-    const client = new ChecksClient(octokit, REPO, 'stack-gate');
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization');
     const result = await client.write(entry());
     expect(result).toEqual({ id: 77, created: false });
     expect(calls.create).toHaveLength(0);
@@ -171,7 +171,7 @@ describe('ChecksClient.write', () => {
 
   it('omits conclusion when holding a check in progress', async () => {
     const { octokit, calls } = fakeOctokit({});
-    const client = new ChecksClient(octokit, REPO, 'stack-gate');
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization');
     await client.write(entry({ status: 'in_progress', conclusion: null }));
     expect(calls.create[0]).toMatchObject({ status: 'in_progress' });
     expect(calls.create[0]).not.toHaveProperty('conclusion');
@@ -179,7 +179,7 @@ describe('ChecksClient.write', () => {
 
   it('writes provenance into external_id', async () => {
     const { octokit, calls } = fakeOctokit({});
-    const client = new ChecksClient(octokit, REPO, 'stack-gate');
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization');
     await client.write(entry());
     const external = (calls.create[0] as { external_id: string }).external_id;
     expect(decodeProvenance(external)?.src).toBe('mirror');
@@ -187,7 +187,7 @@ describe('ChecksClient.write', () => {
 
   it('lets a standalone caller own the correlation id', async () => {
     const { octokit, calls } = fakeOctokit({});
-    const client = new ChecksClient(octokit, REPO, 'stack-gate', 'my-own-id');
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization', 'my-own-id');
     await client.write(entry());
     expect(calls.create[0]).toMatchObject({ external_id: 'my-own-id' });
   });
@@ -201,7 +201,7 @@ describe('ChecksClient.write', () => {
         throw Object.assign(new Error('Resource not accessible by integration'), { status: 403 });
       },
     });
-    const client = new ChecksClient(octokit, REPO, 'stack-gate');
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization');
     const result = await client.write(entry());
     expect(result).toEqual({ id: 999, created: true });
     expect(calls.update).toHaveLength(1);
@@ -215,13 +215,13 @@ describe('ChecksClient.write', () => {
         throw Object.assign(new Error('Validation failed'), { status: 422 });
       },
     });
-    const client = new ChecksClient(octokit, REPO, 'stack-gate');
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization');
     await expect(client.write(entry())).rejects.toThrow('Validation failed');
   });
 
   it('includes extended text only when given', async () => {
     const { octokit, calls } = fakeOctokit({});
-    const client = new ChecksClient(octokit, REPO, 'stack-gate');
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization');
     await client.write(entry(), 'the details');
     expect(calls.create[0]).toMatchObject({
       output: { title: 'Mirrors #6', summary: 'Gated by #6.', text: 'the details' },

@@ -106,7 +106,7 @@ export function parseContextInput(raw: string): StackContext | null {
   }
   const ctx = parsed as StackContext;
   if (typeof ctx.pr !== 'number' || typeof ctx.inStack !== 'boolean') {
-    throw new Error('The `context` input is not a stack-gate context object.');
+    throw new Error('The `context` input is not a stack-optimization context object.');
   }
   return ctx;
 }

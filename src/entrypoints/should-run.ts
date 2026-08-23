@@ -1,4 +1,4 @@
-/** `stack-gate/should-run` — the first step in the CI workflow. */
+/** `stack-optimization/should-run` — the first step in the CI workflow. */
 import * as core from '@actions/core';
 import { fail, getRepo, makeOctokit, prNumberFromEvent } from '../github.js';
 import { resolveConfig } from '../config.js';
@@ -43,7 +43,7 @@ async function main(): Promise<void> {
   } else {
     core.info(
       `Skipping CI on #${prNumber}: it mirrors #${ctx.authorityPr}, whose tree contains ` +
-        'every change in this PR. The stack-gate check will be posted out of band.',
+        'every change in this PR. The stack-optimization check will be posted out of band.',
     );
   }
 }
