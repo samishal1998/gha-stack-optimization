@@ -636,6 +636,39 @@ scenario('21. A real verdict clears a withheld check');
 }
 
 // ===========================================================================
+scenario('22. A workflow run with no pull request behind it is not an error');
+{
+  // Every push to the default branch produces one of these. Failing would paint
+  // the gate red constantly and teach people to ignore it.
+  const mock = await startMockGitHub({ prs: [], stack: null, checkRuns: [], configYml: null });
+  const wr = {
+    workflow_run: {
+      id: 123,
+      html_url: 'https://x/1',
+      conclusion: 'success',
+      head_sha: 'nosuchsha',
+      head_branch: 'main',
+      event: 'push',
+      pull_requests: [],
+    },
+  };
+  const ctx = await runAction('context', {
+    apiUrl: mock.url,
+    event: wr,
+    eventName: 'workflow_run',
+  });
+  check('context succeeds', ctx.failed, false);
+  check('and reports no stack', ctx.outputs['in-stack'], 'false');
+
+  const v = await runAction('verdict', { apiUrl: mock.url, event: wr, eventName: 'workflow_run' });
+  check('verdict succeeds', v.failed, false);
+  check('with an empty plan', v.outputs.plan, '[]');
+  check('nothing to propagate', v.outputs['affected-count'], '0');
+  check('and nothing was written', mock.state.checkRuns.length, 0);
+  await mock.close();
+}
+
+// ===========================================================================
 const failed = results.filter((r) => !r.ok);
 const scenarios = new Set(results.map((r) => r.scenario));
 console.log(
