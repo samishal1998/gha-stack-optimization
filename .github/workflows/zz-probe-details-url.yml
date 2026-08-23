@@ -1,0 +1,26 @@
+name: Probe details_url
+on: workflow_dispatch
+
+permissions:
+  checks: write
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      # Raw API calls, no project code involved: does GitHub persist an
+      # explicit details_url on a check run created by the github-actions app?
+      - name: Create with an explicit details_url
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          SHA=${{ github.sha }}
+          echo '{"name":"probe-details","head_sha":"'"$SHA"'","status":"completed",
+                 "conclusion":"neutral","details_url":"https://example.com/explicit-target",
+                 "output":{"title":"probe","summary":"probe"}}' > body.json
+          ID=$(gh api --method POST "repos/${{ github.repository }}/check-runs" --input body.json --jq .id)
+          echo "created check run $ID"
+          echo "--- read back ---"
+          gh api "repos/${{ github.repository }}/check-runs/$ID" --jq '{details_url, html_url}'
