@@ -297,10 +297,15 @@ PR owns its own verdict, `in_progress` otherwise. (Only `seed` ever writes
 mirroring PR in its segment is rewritten, including from `success` back to
 `failure` and back again.
 
-On a mirrored check, the Details link points at the **authority's** run, so a red
-parent takes you straight to the failing head run. The summary names the authority
-(`Gated by #6 (stack head)`), which makes the system legible from the PR page
-without reading any of this.
+Every check's summary names the authority and links to its run — for example
+`Gated by #6 (stack head)` followed by a link to #6's failing CI run. That makes
+the system legible from the PR page without reading any of this.
+
+The link is in the summary rather than the check's **Details** button for a
+reason worth knowing: GitHub discards `details_url` on check runs created by the
+built-in `github-actions` app and substitutes the check run's own page. The gate
+still sends it, so it works if you supply a GitHub App token, but nothing may be
+promised on the default token — hence the summary.
 
 ### Reconciliation
 

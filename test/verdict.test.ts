@@ -123,6 +123,31 @@ describe('authority CI completes', () => {
     expect(entries[1]!.summary).toContain('#4');
   });
 
+  it('puts the authority run link in the summary, not just details_url', () => {
+    // GitHub discards details_url on check runs created by the github-actions
+    // app, so the summary is the only channel that survives.
+    const { plan: entries } = plan({
+      ctx: contextFor(stack, 4),
+      trigger: 'ci-completed',
+      ownConclusion: 'failure',
+      ownRunUrl: 'https://example.test/run/head',
+    });
+    expect(entries[0]!.summary).toContain('[View the run](https://example.test/run/head)');
+    for (const e of entries.slice(1)) {
+      expect(e.summary).toContain("[View #4's CI run](https://example.test/run/head)");
+    }
+  });
+
+  it('omits the link when there is no run url', () => {
+    const { plan: entries } = plan({
+      ctx: contextFor(stack, 4),
+      trigger: 'ci-completed',
+      ownConclusion: 'success',
+      ownRunUrl: undefined,
+    });
+    expect(entries.every((e) => !e.summary.includes(']('))).toBe(true);
+  });
+
   it('propagates a failure down the segment by default', () => {
     const { plan: entries } = plan({
       ctx: contextFor(stack, 4),
