@@ -1,6 +1,6 @@
-name: 'stack-gate: post-check'
+name: 'stack-optimization: post-check'
 description: 'Create or update a check run on a commit, idempotently on (name, sha).'
-author: 'stack-gate'
+author: 'stack-optimization'
 
 inputs:
   token:
@@ -10,7 +10,7 @@ inputs:
   name:
     description: 'Check run name. This is the name branch protection requires.'
     required: false
-    default: 'stack-gate'
+    default: 'stack-optimization'
   sha:
     description: 'Commit to write the check run to.'
     required: true
@@ -34,7 +34,7 @@ inputs:
     description: 'Link target for the check run.'
     required: false
   external-id:
-    description: 'Correlation id. Overrides the provenance marker stack-gate would otherwise write.'
+    description: 'Correlation id. Overrides the provenance marker stack-optimization would otherwise write.'
     required: false
 
 outputs:

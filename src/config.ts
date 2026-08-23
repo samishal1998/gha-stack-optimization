@@ -11,7 +11,7 @@ import { optionalBoolean, optionalList, optionalString } from './github.js';
 import type { Octokit, Repo } from './github.js';
 import { DEFAULT_CONFIG, type ResolvedConfig } from './types.js';
 
-const DEFAULT_CONFIG_PATH = '.github/stack-gate.yml';
+const DEFAULT_CONFIG_PATH = '.github/stack-optimization.yml';
 
 interface FileConfig {
   'check-name'?: unknown;

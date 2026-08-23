@@ -1,4 +1,4 @@
-/** `stack-gate/propagate` — execute a verdict plan. */
+/** `stack-optimization/propagate` — execute a verdict plan. */
 import * as core from '@actions/core';
 import { ChecksClient, mapWithConcurrency, withRetry } from '../checks.js';
 import { fail, getRepo, makeOctokit, optionalBoolean, optionalString } from '../github.js';

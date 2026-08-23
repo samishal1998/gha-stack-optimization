@@ -6,7 +6,7 @@ import { DEFAULT_CONFIG } from '../src/types.js';
  * Input precedence is load-bearing, not cosmetic. The reusable workflow used to
  * forward its own defaults, so an action input was never empty and always beat
  * the repository config file. A repo configured with `check-name: ci-gate` got
- * checks named `stack-gate` while branch protection waited for `ci-gate`, and
+ * checks named `stack-optimization` while branch protection waited for `ci-gate`, and
  * every pull request was blocked forever. These tests pin the ordering.
  */
 

@@ -10,7 +10,7 @@ import type { GateCheckState, PlanEntry, Provenance } from './types.js';
 import type { Octokit, Repo } from './github.js';
 
 /** Marker prefix so a check run written by something else is never mistaken for ours. */
-const PROVENANCE_PREFIX = 'stack-gate:';
+const PROVENANCE_PREFIX = 'stack-optimization:';
 
 export function encodeProvenance(p: Provenance): string {
   return PROVENANCE_PREFIX + JSON.stringify(p);

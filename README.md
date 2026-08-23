@@ -1,4 +1,4 @@
-# stack-gate
+# stack-optimization
 
 **Composable GitHub Actions for stack-aware CI gating.**
 
@@ -8,7 +8,7 @@ validates anything — the head contains every change below it. Everything
 underneath is spending runner minutes to re-prove a subset of what the head has
 already proved.
 
-`stack-gate` runs CI **once per stack segment** instead of once per PR, and posts
+`stack-optimization` runs CI **once per stack segment** instead of once per PR, and posts
 a single stable required check on every PR so that nothing is ever blocked by a
 check that never reported.
 
@@ -71,7 +71,7 @@ The required check is deliberately **not** a workflow job. A job's status is
 permanently bound to the commit of the run that produced it, and cannot be
 rewritten later — which is exactly what a parent PR needs when a descendant
 changes. Instead the gate writes a check run under a stable name (default
-`stack-gate`) through the Checks API, which it can rewrite on any commit at any
+`stack-optimization`) through the Checks API, which it can rewrite on any commit at any
 time. Branch protection requires that name. Your CI jobs stay visible for
 debugging, but are not required.
 
@@ -136,7 +136,7 @@ jobs:
     outputs:
       should-run: ${{ steps.d.outputs.should-run }}
     steps:
-      - uses: your-org/stack-gate/actions/should-run@v1
+      - uses: samishal1998/stack-optimization/actions/should-run@v1
         id: d
 
   test:
@@ -154,8 +154,8 @@ decision job takes a few seconds, so a mirrored PR costs almost nothing.
 ### 2. Add the gate workflow
 
 ```yaml
-# .github/workflows/stack-gate.yml
-name: Stack Gate
+# .github/workflows/stack-optimization.yml
+name: Stack Optimization Gate
 
 on:
   workflow_run:
@@ -180,15 +180,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: stack-gate
+  group: stack-optimization
   cancel-in-progress: false # a cancelled gate leaves checks half-written
   queue: max # without this, queued gate runs are silently dropped
 
 jobs:
   gate:
-    uses: your-org/stack-gate/.github/workflows/gate.yml@v1
+    uses: samishal1998/stack-optimization/.github/workflows/gate.yml@v1
     with:
-      check-name: stack-gate
+      check-name: stack-optimization
       checkpoint-label: stack-checkpoint
 ```
 
@@ -202,7 +202,7 @@ take effect. See [Reconciliation](#reconciliation).
 
 **Why `pull_request_target` rather than `pull_request`.** A `pull_request` event
 from a fork receives a read-only token no matter what the `permissions:` block
-says. The gate could not post a check on a fork PR at all — and if `stack-gate`
+says. The gate could not post a check on a fork PR at all — and if `stack-optimization`
 is a required check, that PR would be blocked forever.
 
 The usual danger of `pull_request_target` is checking out and executing PR code
@@ -232,9 +232,9 @@ would be dropped — and a dropped gate run is a verdict that never gets written
 `queue: max` queues up to 100 in FIFO order instead. It cannot be combined with
 `cancel-in-progress: true`, which you do not want here anyway.
 
-### 3. Make `stack-gate` the required check
+### 3. Make `stack-optimization` the required check
 
-In branch protection or a ruleset, require the status check named `stack-gate`.
+In branch protection or a ruleset, require the status check named `stack-optimization`.
 Leave your CI jobs visible but **not** required: they are for debugging, and the
 gate is the contract.
 
@@ -322,8 +322,8 @@ Every setting can be given as an action input or in an optional config file.
 Inputs win over the file; the file wins over the defaults.
 
 ```yaml
-# .github/stack-gate.yml
-check-name: stack-gate
+# .github/stack-optimization.yml
+check-name: stack-optimization
 checkpoint-label: stack-checkpoint
 force-run-label: stack-ci-force
 
@@ -361,7 +361,7 @@ permissions:
   checks: write
   pull-requests: read
   actions: read
-  contents: read # reads .github/stack-gate.yml from the default branch
+  contents: read # reads .github/stack-optimization.yml from the default branch
 ```
 
 ## Security
@@ -405,7 +405,7 @@ from fork PRs through `workflow_run`. Therefore:
   but the check can sit stale until then. If you regularly generate that much PR
   traffic, split the gate per target branch and accept the narrower
   serialisation.
-- `stack-gate` never restacks or manages branches. `gh stack` owns that.
+- `stack-optimization` never restacks or manages branches. `gh stack` owns that.
 - It never runs tests. It decides _whether_ CI should run and _what verdict to
   report_.
 

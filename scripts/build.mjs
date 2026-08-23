@@ -16,8 +16,8 @@ const ACTIONS = ['context', 'should-run', 'post-check', 'verdict', 'propagate', 
 // The bundle is ESM (@actions/core and @actions/github are ESM-only), but some
 // transitive dependencies are CommonJS and call require() at runtime.
 const BANNER =
-  "import { createRequire as __stackGateCreateRequire } from 'node:module';\n" +
-  'const require = __stackGateCreateRequire(import.meta.url);\n';
+  "import { createRequire as __stackOptCreateRequire } from 'node:module';\n" +
+  'const require = __stackOptCreateRequire(import.meta.url);\n';
 
 const results = [];
 

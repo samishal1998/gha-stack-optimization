@@ -153,7 +153,7 @@ export interface ResolvedConfig {
 }
 
 export const DEFAULT_CONFIG: ResolvedConfig = {
-  checkName: 'stack-gate',
+  checkName: 'stack-optimization',
   checkpointLabel: 'stack-checkpoint',
   forceRunLabel: 'stack-ci-force',
   alwaysRunPaths: [],

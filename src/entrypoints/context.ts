@@ -1,4 +1,4 @@
-/** `stack-gate/context` — resolve stack topology for a PR. Pure read. */
+/** `stack-optimization/context` — resolve stack topology for a PR. Pure read. */
 import * as core from '@actions/core';
 import { fail } from '../github.js';
 import { resolve, setContextOutputs } from '../resolve.js';

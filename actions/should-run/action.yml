@@ -1,6 +1,6 @@
-name: 'stack-gate: should-run'
+name: 'stack-optimization: should-run'
 description: 'Decide whether this PR should run the real CI suite, or skip and mirror its authority.'
-author: 'stack-gate'
+author: 'stack-optimization'
 
 inputs:
   token:
@@ -8,7 +8,7 @@ inputs:
     required: false
     default: ${{ github.token }}
   context:
-    description: 'A context JSON from `stack-gate/context`. Resolved internally when omitted.'
+    description: 'A context JSON from `stack-optimization/context`. Resolved internally when omitted.'
     required: false
   pr-number:
     description: 'Pull request to evaluate. Inferred from the event when omitted.'
@@ -28,7 +28,7 @@ inputs:
   config-path:
     description: 'Path to the repository config file, read from the default branch.'
     required: false
-    default: '.github/stack-gate.yml'
+    default: '.github/stack-optimization.yml'
 
 outputs:
   should-run:

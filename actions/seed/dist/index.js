@@ -1,5 +1,5 @@
-import { createRequire as __stackGateCreateRequire } from 'node:module';
-const require = __stackGateCreateRequire(import.meta.url);
+import { createRequire as __stackOptCreateRequire } from 'node:module';
+const require = __stackOptCreateRequire(import.meta.url);
 
 var __create = Object.create;
 var __defProp = Object.defineProperty;
@@ -20117,7 +20117,7 @@ function info(message) {
 }
 
 // src/checks.ts
-var PROVENANCE_PREFIX = "stack-gate:";
+var PROVENANCE_PREFIX = "stack-optimization:";
 function encodeProvenance(p) {
   return PROVENANCE_PREFIX + JSON.stringify(p);
 }
@@ -27480,7 +27480,7 @@ var {
 
 // src/types.ts
 var DEFAULT_CONFIG = {
-  checkName: "stack-gate",
+  checkName: "stack-optimization",
   checkpointLabel: "stack-checkpoint",
   forceRunLabel: "stack-ci-force",
   alwaysRunPaths: [],
@@ -27489,7 +27489,7 @@ var DEFAULT_CONFIG = {
 };
 
 // src/config.ts
-var DEFAULT_CONFIG_PATH = ".github/stack-gate.yml";
+var DEFAULT_CONFIG_PATH = ".github/stack-optimization.yml";
 function asString(value) {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : void 0;
 }
@@ -27769,7 +27769,7 @@ function parseContextInput(raw) {
   }
   const ctx = parsed;
   if (typeof ctx.pr !== "number" || typeof ctx.inStack !== "boolean") {
-    throw new Error("The `context` input is not a stack-gate context object.");
+    throw new Error("The `context` input is not a stack-optimization context object.");
   }
   return ctx;
 }
