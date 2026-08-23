@@ -71,7 +71,7 @@ jobs:
     steps:
       - name: Resolve stack topology
         id: context
-        uses: samishal1998/stack-optimization/actions/context@v1
+        uses: samishal1998/gha-stack-optimization/actions/context@v1
         with:
           token: ${{ secrets.token || github.token }}
           checkpoint-label: ${{ inputs.checkpoint-label }}
@@ -79,7 +79,7 @@ jobs:
 
       - name: Compute verdict plan
         id: verdict
-        uses: samishal1998/stack-optimization/actions/verdict@v1
+        uses: samishal1998/gha-stack-optimization/actions/verdict@v1
         with:
           token: ${{ secrets.token || github.token }}
           context: ${{ steps.context.outputs.context }}
@@ -92,7 +92,7 @@ jobs:
 
       - name: Post check runs
         if: steps.verdict.outputs.affected-count != '0'
-        uses: samishal1998/stack-optimization/actions/propagate@v1
+        uses: samishal1998/gha-stack-optimization/actions/propagate@v1
         with:
           token: ${{ secrets.token || github.token }}
           plan: ${{ steps.verdict.outputs.plan }}

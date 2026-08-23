@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "build": "node scripts/build.mjs",
     "format": "prettier --write 'src/**/*.ts' 'test/**/*.ts' 'scripts/**/*.mjs' README.md '**/*.yml'",
-    "format:check": "prettier --check 'src/**/*.ts' 'test/**/*.ts' 'scripts/**/*.mjs' README.md '**/*.yml'"
+    "format:check": "prettier --check 'src/**/*.ts' 'test/**/*.ts' 'scripts/**/*.mjs' README.md '**/*.yml'",
+    "test:integration": "npm run build --silent && node test/integration/scenarios.test.mjs"
   },
   "dependencies": {
     "@actions/core": "^3.0.1",

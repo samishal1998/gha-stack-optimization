@@ -38,9 +38,10 @@ async function main(): Promise<void> {
     provenance: { v: 1, src: 'hold', auth: null, authSha: null, forced: false },
   };
 
-  // An explicit external-id wins: a caller using this primitive standalone owns
-  // the correlation id, and no provenance of ours applies.
-  const externalId = optionalString('external-id');
+  // This primitive knows nothing about stacks, so it never writes the gate's
+  // provenance marker. The caller's own correlation id is used if given, and
+  // otherwise `external_id` is left alone entirely.
+  const externalId = optionalString('external-id') ?? null;
   const client = new ChecksClient(makeOctokit(), getRepo(), name, externalId);
   const result = await withRetry(`post-check ${name}@${sha.slice(0, 7)}`, () =>
     client.write(entry, optionalString('text')),
