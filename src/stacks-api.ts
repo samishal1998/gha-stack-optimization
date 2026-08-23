@@ -108,19 +108,27 @@ export class NativeStacksProvider implements TopologyProvider {
   }
 
   /**
-   * PRs carrying the checkpoint label, in one request rather than one per
-   * member. Labels live on the issue, so the issues endpoint answers for the
-   * whole repository at once.
+   * PRs carrying the checkpoint label.
+   *
+   * This deliberately does not use `GET /repos/{owner}/{repo}/issues`, which can
+   * filter by label server-side but requires the `issues: read` permission — a
+   * scope this suite would otherwise never need, and one every consumer would
+   * have to grant. Listing pull requests returns their labels and needs only
+   * `pull-requests: read`, which is already required.
+   *
+   * Most repositories have fewer than a hundred open pull requests, so this is
+   * one request; it degrades to one per hundred beyond that.
    */
   private async checkpointPrs(): Promise<Set<number>> {
-    const issues = await this.octokit.paginate(this.octokit.rest.issues.listForRepo, {
+    const open = await this.octokit.paginate(this.octokit.rest.pulls.list, {
       ...this.repo,
-      labels: this.checkpointLabel,
       state: 'open',
       per_page: 100,
     });
     return new Set(
-      issues.filter((issue) => issue.pull_request != null).map((issue) => issue.number),
+      open
+        .filter((pull) => pull.labels.some((label) => label.name === this.checkpointLabel))
+        .map((pull) => pull.number),
     );
   }
 }

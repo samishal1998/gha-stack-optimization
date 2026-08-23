@@ -27573,19 +27573,25 @@ var NativeStacksProvider = class {
     }
   }
   /**
-   * PRs carrying the checkpoint label, in one request rather than one per
-   * member. Labels live on the issue, so the issues endpoint answers for the
-   * whole repository at once.
+   * PRs carrying the checkpoint label.
+   *
+   * This deliberately does not use `GET /repos/{owner}/{repo}/issues`, which can
+   * filter by label server-side but requires the `issues: read` permission — a
+   * scope this suite would otherwise never need, and one every consumer would
+   * have to grant. Listing pull requests returns their labels and needs only
+   * `pull-requests: read`, which is already required.
+   *
+   * Most repositories have fewer than a hundred open pull requests, so this is
+   * one request; it degrades to one per hundred beyond that.
    */
   async checkpointPrs() {
-    const issues = await this.octokit.paginate(this.octokit.rest.issues.listForRepo, {
+    const open2 = await this.octokit.paginate(this.octokit.rest.pulls.list, {
       ...this.repo,
-      labels: this.checkpointLabel,
       state: "open",
       per_page: 100
     });
     return new Set(
-      issues.filter((issue2) => issue2.pull_request != null).map((issue2) => issue2.number)
+      open2.filter((pull) => pull.labels.some((label) => label.name === this.checkpointLabel)).map((pull) => pull.number)
     );
   }
 };
@@ -29622,12 +29628,8 @@ async function evaluateHatches(octokit, repo, prNumber, config) {
   return { forcedByLabel: false, forcedByPath };
 }
 async function hasLabel(octokit, repo, prNumber, label) {
-  const labels = await octokit.paginate(octokit.rest.issues.listLabelsOnIssue, {
-    ...repo,
-    issue_number: prNumber,
-    per_page: 100
-  });
-  return labels.some((l) => l.name === label);
+  const { data } = await octokit.rest.pulls.get({ ...repo, pull_number: prNumber });
+  return data.labels.some((l) => l.name === label);
 }
 async function touchesPaths(octokit, repo, prNumber, globs) {
   const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
