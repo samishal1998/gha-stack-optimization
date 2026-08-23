@@ -180,9 +180,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: stack-optimization
+  # Per branch, not repo-wide. See the note below.
+  group: >-
+    stack-optimization-${{ github.event.workflow_run.head_branch
+    || github.event.pull_request.head.ref
+    || github.ref }}
   cancel-in-progress: false # a cancelled gate leaves checks half-written
-  queue: max # without this, queued gate runs are silently dropped
 
 jobs:
   gate:
@@ -214,23 +217,30 @@ metadata only, which is precisely the condition that makes
 One consequence: `pull_request_target` always runs the version of the workflow
 file on your default branch, so changes to it only take effect once merged.
 
-**Why the concurrency group is repo-wide, and why `queue: max`.** Two gate runs
-touching the same stack must not interleave. One writing `#6`'s fresh verdict
-while another writes `#4`'s stale one produces exactly the contradiction the check
-exists to prevent.
+**Why the concurrency group is per branch.** GitHub allows exactly one _pending_
+run per concurrency group: when a third run is queued behind a running one, the
+second is cancelled to make room. So the choice of group decides which runs get
+discarded, and that is the whole reason to think about it.
 
-The natural key would be the stack id, but concurrency groups are evaluated
-before any step runs, and nothing available at trigger time identifies the stack:
-a `workflow_run` payload carries only the head branch, and a stacked PR's
-`base.ref` is its parent's branch rather than the stack's target. So the group is
-the whole repository. Gate runs take seconds and never run tests, so this costs
-very little.
+Grouping per branch means a discarded run is always one that a newer run for the
+**same branch** supersedes. The newer run reads fresher state and computes the
+same or a better answer, so nothing is lost. This is also where events actually
+pile up in practice — rapid pushes and label toggles on one PR.
 
-`queue: max` is not optional. By default GitHub allows exactly **one** pending run
-per concurrency group and cancels any earlier pending one. Under load, gate runs
-would be dropped — and a dropped gate run is a verdict that never gets written.
-`queue: max` queues up to 100 in FIFO order instead. It cannot be combined with
-`cancel-in-progress: true`, which you do not want here anyway.
+Grouping repo-wide would be worse, even though it looks safer. A discarded run
+could be about a completely unrelated PR, and that PR's verdict would simply never
+be written. Trading a narrow problem for a broad one.
+
+The group you would really want is the stack id, so that two PRs in one stack
+never write at once. That is not available: concurrency groups are evaluated
+before any step runs, and nothing at trigger time identifies the stack — a
+`workflow_run` payload carries only the head branch, and a stacked PR's
+`base.ref` is its parent's branch, not the stack's target. Two PRs in the same
+stack receiving events simultaneously can therefore both write. See
+[Limitations](#limitations).
+
+Keep `cancel-in-progress: false`. A gate run cancelled midway leaves checks
+half-written.
 
 ### 3. Make `stack-optimization` the required check
 
@@ -400,11 +410,13 @@ from fork PRs through `workflow_run`. Therefore:
 - Promoting a PR to checkpoint **temporarily blocks its segment** until that PR
   runs real CI. This is deliberate — the alternative is honouring a verdict it
   never earned — but it is a merge block, so promote before you need to merge.
-- With more than 100 gate runs pending at once, GitHub drops the overflow and
-  those verdicts are not written. Any later event on an affected PR reconciles it,
-  but the check can sit stale until then. If you regularly generate that much PR
-  traffic, split the gate per target branch and accept the narrower
-  serialisation.
+- **Two PRs in the same stack can be gated at the same time.** The concurrency
+  group is per branch, because nothing available at trigger time identifies the
+  stack, so simultaneous events on different PRs of one stack are not serialised
+  against each other. Each run computes from live state, and any later event
+  reconciles, so this is self-correcting rather than persistent — but a check can
+  briefly disagree with its authority. GitHub's `concurrency` cannot express
+  "one at a time per stack" today.
 - `stack-optimization` never restacks or manages branches. `gh stack` owns that.
 - It never runs tests. It decides _whether_ CI should run and _what verdict to
   report_.
