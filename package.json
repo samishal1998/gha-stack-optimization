@@ -13,8 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "node scripts/build.mjs",
-    "format": "prettier --write 'src/**/*.ts' 'test/**/*.ts' 'scripts/**/*.mjs' README.md '**/*.yml'",
-    "format:check": "prettier --check 'src/**/*.ts' 'test/**/*.ts' 'scripts/**/*.mjs' README.md '**/*.yml'",
+    "format": "prettier --write 'src/**/*.ts' 'test/**/*.ts' 'scripts/**/*.mjs' '.claude/skills/**/*.mjs' README.md GUIDE.md '**/*.yml'",
+    "format:check": "prettier --check 'src/**/*.ts' 'test/**/*.ts' 'scripts/**/*.mjs' '.claude/skills/**/*.mjs' README.md GUIDE.md '**/*.yml'",
     "test:integration": "npm run build --silent && node test/integration/scenarios.test.mjs"
   },
   "dependencies": {

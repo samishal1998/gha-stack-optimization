@@ -256,6 +256,42 @@ PRs.
 
 ---
 
+## Setting it up with an agent
+
+This repository ships a Claude Code skill that does the wiring for you. Copy it
+into the repository you want to gate:
+
+```bash
+mkdir -p .claude/skills
+cp -r /path/to/gha-stack-optimization/.claude/skills/stack-optimization .claude/skills/
+```
+
+Then ask for what you want, in your own words:
+
+> gate my CI workflow so stacked PRs don't all run the full suite
+
+> set up stack-aware CI, call the check `ci-gate`, and post it as our release bot
+
+The skill knows the parts that are easy to get wrong — matching `workflows:` to a
+workflow's `name:` rather than its filename, `pull_request_target` versus
+`pull_request` for fork PRs, the four permissions, the concurrency grouping, and
+the input-versus-config-file precedence that can leave branch protection waiting
+for a check that never appears. It also refuses to make the check required until
+a dry run has been confirmed.
+
+It ships a linter you can run yourself at any time, which checks the wiring
+without needing an agent at all:
+
+```bash
+node .claude/skills/stack-optimization/scripts/verify-gating.mjs
+```
+
+It reports, with a fix for each: jobs that are not actually gated (so no CI is
+saved), a `workflows:` name that matches nothing, a missing permission, a
+`queue:` key that makes GitHub reject the file outright, `cancel-in-progress`
+left on, and a check name set in two places at once. Exit code 1 means do not
+make the check required yet.
+
 ## What is in the box
 
 Six actions plus a reusable workflow. The reusable workflow is the

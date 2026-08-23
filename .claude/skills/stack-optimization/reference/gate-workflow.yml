@@ -1,0 +1,54 @@
+# .github/workflows/stack-gate.yml
+#
+# Substitute:
+#   'CI'                  -> the `name:` of the workflow that runs your tests
+#   stack-optimization    -> your check name, IF you are not setting it in
+#                            .github/stack-optimization.yml (an input beats the
+#                            config file, so do not set it in both places)
+name: Stack Gate
+
+on:
+  workflow_run:
+    workflows: ['CI'] # must match the CI workflow's `name:`, not its filename
+    types: [completed]
+  # pull_request_target, not pull_request: a fork PR's pull_request token is
+  # read-only and could not post the check at all. This workflow never checks
+  # out or runs PR code, which is what makes that safe.
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - converted_to_draft
+      - labeled # checkpoints take effect through these two
+      - unlabeled
+      - closed
+      - stacked
+
+permissions:
+  checks: write
+  pull-requests: read
+  actions: read
+  contents: read # reads .github/stack-optimization.yml from the default branch
+
+concurrency:
+  # Per branch. GitHub allows one pending run per group, so grouping per branch
+  # means a dropped run is always superseded by a newer one for the same branch.
+  # Repo-wide grouping would drop runs belonging to unrelated PRs.
+  group: >-
+    stack-optimization-${{ github.event.workflow_run.head_branch
+    || github.event.pull_request.head.ref
+    || github.ref }}
+  cancel-in-progress: false # a cancelled gate leaves checks half-written
+  # Do NOT add a `queue:` key here. GitHub rejects the whole workflow file.
+
+jobs:
+  gate:
+    uses: samishal1998/gha-stack-optimization/.github/workflows/gate.yml@v1
+    # with:
+    #   check-name: stack-optimization
+    #   checkpoint-label: stack-checkpoint
+    #   dry-run: true          # use this for the first run, then remove it
+    # secrets:
+    #   token: ${{ secrets.MY_APP_TOKEN }}   # see "Bot identity" in SKILL.md

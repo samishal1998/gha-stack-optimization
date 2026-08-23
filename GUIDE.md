@@ -136,7 +136,7 @@ would have written.
 
 A workflow job's status is permanently bound to the commit of the run that
 produced it. You cannot go back and change it. That is a problem, because the
-verdict for a parent PR needs to change when a *descendant* changes, and nothing
+verdict for a parent PR needs to change when a _descendant_ changes, and nothing
 in the `pull_request` event model wakes a parent up when its child moves.
 
 So the required check is not a job. It is a check run that the gate creates
@@ -144,11 +144,11 @@ through the Checks API, under a stable name. The gate can write, and rewrite,
 that check on any commit in the repository at any time. Three hard problems
 collapse into one easy one:
 
-| Problem | Becomes |
-|---|---|
-| A parent is stale after a new head is pushed | Post the right check on the parent's commit |
-| A partial merge needs an independent verdict | Post the right check on the cut point's commit |
-| A PR is blocked by a check that never reported | Post *a* check on the commit |
+| Problem                                        | Becomes                                        |
+| ---------------------------------------------- | ---------------------------------------------- |
+| A parent is stale after a new head is pushed   | Post the right check on the parent's commit    |
+| A partial merge needs an independent verdict   | Post the right check on the cut point's commit |
+| A PR is blocked by a check that never reported | Post _a_ check on the commit                   |
 
 All three are the same API call.
 
@@ -165,14 +165,14 @@ Most people need two things, and they are both in the README quickstart:
 That is the whole setup. The individual actions are exposed for the cases where
 the reusable workflow does not fit:
 
-| If you want to… | Use |
-|---|---|
-| Just make it work | `should-run` + the reusable `gate.yml` |
+| If you want to…                                                                | Use                                          |
+| ------------------------------------------------------------------------------ | -------------------------------------------- |
+| Just make it work                                                              | `should-run` + the reusable `gate.yml`       |
 | Run the gate steps inline, with your own logging or notifications between them | `context`, `verdict`, `propagate` separately |
-| See what the gate *would* do without it writing anything | The reusable workflow with `dry-run: true` |
-| Branch your CI workflow on stack position (not just run/skip) | `context` |
-| Guarantee the check exists in two seconds, from inside your CI workflow | `seed` |
-| Write your own check runs for something unrelated to stacks | `post-check` |
+| See what the gate _would_ do without it writing anything                       | The reusable workflow with `dry-run: true`   |
+| Branch your CI workflow on stack position (not just run/skip)                  | `context`                                    |
+| Guarantee the check exists in two seconds, from inside your CI workflow        | `seed`                                       |
+| Write your own check runs for something unrelated to stacks                    | `post-check`                                 |
 
 ---
 
@@ -197,36 +197,36 @@ so you rarely need this on its own. Two cases where you do:
 
 **Inputs.**
 
-| Input | Default | Notes |
-|---|---|---|
-| `token` | `${{ github.token }}` | Needs `pull-requests: read` and `contents: read` |
-| `pr-number` | inferred from the event | Set this when the event is not a PR event |
-| `checkpoint-label` | `stack-checkpoint` | Overrides the config file |
-| `skip-draft-head` | `true` | Overrides the config file |
-| `config-path` | `.github/stack-optimization.yml` | Read from the default branch |
+| Input              | Default                          | Notes                                            |
+| ------------------ | -------------------------------- | ------------------------------------------------ |
+| `token`            | `${{ github.token }}`            | Needs `pull-requests: read` and `contents: read` |
+| `pr-number`        | inferred from the event          | Set this when the event is not a PR event        |
+| `checkpoint-label` | `stack-checkpoint`               | Overrides the config file                        |
+| `skip-draft-head`  | `true`                           | Overrides the config file                        |
+| `config-path`      | `.github/stack-optimization.yml` | Read from the default branch                     |
 
 **Outputs.**
 
-| Output | Type | Meaning |
-|---|---|---|
-| `in-stack` | bool | Whether the PR is in a stack with more than one open member |
-| `stack-id` | string | The repository's stack number, stable for the stack's life |
-| `target-branch` | string | The stack's **final** target branch, not the PR's direct base |
-| `position` | int | 0-indexed from the root, counting only open members |
-| `size` | int | Number of open members |
-| `sha` | string | This PR's head commit |
-| `is-head` | bool | Topmost open PR in the stack |
-| `is-root` | bool | Bottom open PR in the stack |
-| `is-checkpoint` | bool | Carries the checkpoint label |
-| `is-authority` | bool | Runs real CI and establishes a verdict |
-| `authority-pr` | int | The PR whose verdict governs this one |
-| `authority-sha` | string | That PR's head commit |
-| `authority-role` | enum | Why it is the authority: `head`, `checkpoint`, or `non-draft-head` |
-| `segment` | JSON | `[{pr, sha, is_authority}]`, authority first, then downward |
-| `ancestors` | JSON | Open PRs below this one, ordered toward the root |
-| `descendants` | JSON | Open PRs above this one, ordered toward the head |
-| `stack` | JSON | The full open topology, root to head |
-| `context` | JSON | Everything above in one object, for passing to other actions |
+| Output           | Type   | Meaning                                                            |
+| ---------------- | ------ | ------------------------------------------------------------------ |
+| `in-stack`       | bool   | Whether the PR is in a stack with more than one open member        |
+| `stack-id`       | string | The repository's stack number, stable for the stack's life         |
+| `target-branch`  | string | The stack's **final** target branch, not the PR's direct base      |
+| `position`       | int    | 0-indexed from the root, counting only open members                |
+| `size`           | int    | Number of open members                                             |
+| `sha`            | string | This PR's head commit                                              |
+| `is-head`        | bool   | Topmost open PR in the stack                                       |
+| `is-root`        | bool   | Bottom open PR in the stack                                        |
+| `is-checkpoint`  | bool   | Carries the checkpoint label                                       |
+| `is-authority`   | bool   | Runs real CI and establishes a verdict                             |
+| `authority-pr`   | int    | The PR whose verdict governs this one                              |
+| `authority-sha`  | string | That PR's head commit                                              |
+| `authority-role` | enum   | Why it is the authority: `head`, `checkpoint`, or `non-draft-head` |
+| `segment`        | JSON   | `[{pr, sha, is_authority}]`, authority first, then downward        |
+| `ancestors`      | JSON   | Open PRs below this one, ordered toward the root                   |
+| `descendants`    | JSON   | Open PRs above this one, ordered toward the head                   |
+| `stack`          | JSON   | The full open topology, root to head                               |
+| `context`        | JSON   | Everything above in one object, for passing to other actions       |
 
 Two of these matter far more than the rest. `is-authority` drives the skip
 decision. `segment` drives propagation. You will probably never need the raw
@@ -236,7 +236,7 @@ decision. `segment` drives propagation. You will probably never need the raw
 
 Merged and closed PRs are dropped before anything is computed. This is what makes
 "the head PR merged" resolve correctly with no special handling: once `#6` merges,
-it is no longer in the active set, so `#5` simply *is* the head now, and
+it is no longer in the active set, so `#5` simply _is_ the head now, and
 `position` and `size` renumber to match.
 
 A stack with only one open member is reported as `in-stack: false`. With nothing
@@ -289,25 +289,25 @@ depend on, so a skipped PR costs one short job instead of a full suite.
 
 **Inputs.**
 
-| Input | Default | Notes |
-|---|---|---|
-| `token` | `${{ github.token }}` | Needs `pull-requests: read` and `contents: read` |
-| `context` | resolved internally | Pass `context`'s output to avoid resolving twice |
-| `pr-number` | inferred from the event | |
-| `checkpoint-label` | `stack-checkpoint` | Overrides the config file |
-| `force-run-label` | `stack-ci-force` | Overrides the config file |
-| `always-run-paths` | none | Newline- or comma-separated globs |
-| `skip-draft-head` | `true` | Overrides the config file |
-| `config-path` | `.github/stack-optimization.yml` | Read from the default branch |
+| Input              | Default                          | Notes                                            |
+| ------------------ | -------------------------------- | ------------------------------------------------ |
+| `token`            | `${{ github.token }}`            | Needs `pull-requests: read` and `contents: read` |
+| `context`          | resolved internally              | Pass `context`'s output to avoid resolving twice |
+| `pr-number`        | inferred from the event          |                                                  |
+| `checkpoint-label` | `stack-checkpoint`               | Overrides the config file                        |
+| `force-run-label`  | `stack-ci-force`                 | Overrides the config file                        |
+| `always-run-paths` | none                             | Newline- or comma-separated globs                |
+| `skip-draft-head`  | `true`                           | Overrides the config file                        |
+| `config-path`      | `.github/stack-optimization.yml` | Read from the default branch                     |
 
 **Outputs.**
 
-| Output | Meaning |
-|---|---|
-| `should-run` | `true` or `false`. This is the one you branch on. |
-| `reason` | Why: `not-in-stack`, `is-head`, `is-checkpoint`, `is-authority`, `forced-by-label`, `forced-by-path`, `mirrors-authority` |
-| `authority-pr` | The PR whose verdict this one will mirror, if it skips |
-| `forced` | `true` when CI is running because of an escape hatch rather than authority status |
+| Output         | Meaning                                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `should-run`   | `true` or `false`. This is the one you branch on.                                                                         |
+| `reason`       | Why: `not-in-stack`, `is-head`, `is-checkpoint`, `is-authority`, `forced-by-label`, `forced-by-path`, `mirrors-authority` |
+| `authority-pr` | The PR whose verdict this one will mirror, if it skips                                                                    |
+| `forced`       | `true` when CI is running because of an escape hatch rather than authority status                                         |
 
 **Behaviour worth knowing.**
 
@@ -372,10 +372,10 @@ the plan before deciding whether to apply it.
 **The two modes.** `verdict` behaves differently depending on whether new CI
 information arrived, and the `conclusion` input is what selects the mode:
 
-- **`conclusion` provided** → *CI-completed mode.* A CI run just finished. If
+- **`conclusion` provided** → _CI-completed mode._ A CI run just finished. If
   this PR is an authority, that result is real and gets propagated across its
   segment.
-- **`conclusion` omitted** → *reconcile mode.* No new CI ran, but something
+- **`conclusion` omitted** → _reconcile mode._ No new CI ran, but something
   structural changed. The verdict is re-derived from the checks already on
   record. This is how a checkpoint label added mid-flight, or a PR leaving its
   stack, takes effect.
@@ -393,28 +393,28 @@ it, and nothing else would ever wake those up.
 
 **Inputs.**
 
-| Input | Default | Notes |
-|---|---|---|
-| `token` | `${{ github.token }}` | Needs `checks: read`, `pull-requests: read`, `contents: read` |
-| `context` | resolved internally | Pass `context`'s output to avoid resolving twice |
-| `pr-number` | inferred from the event | Resolved from the run's commit on `workflow_run` |
-| `conclusion` | none | The completing CI run's conclusion. **Omit to reconcile.** |
-| `run-id` | none | The completing run's id. Logged, for correlation. |
-| `run-url` | none | The completing run's `html_url`. Becomes `details_url`. |
-| `check-name` | `stack-optimization` | Overrides the config file |
-| `checkpoint-label` | `stack-checkpoint` | Overrides the config file |
-| `propagate-failures` | `true` | Overrides the config file |
-| `skip-draft-head` | `true` | Overrides the config file |
-| `config-path` | `.github/stack-optimization.yml` | Read from the default branch |
+| Input                | Default                          | Notes                                                         |
+| -------------------- | -------------------------------- | ------------------------------------------------------------- |
+| `token`              | `${{ github.token }}`            | Needs `checks: read`, `pull-requests: read`, `contents: read` |
+| `context`            | resolved internally              | Pass `context`'s output to avoid resolving twice              |
+| `pr-number`          | inferred from the event          | Resolved from the run's commit on `workflow_run`              |
+| `conclusion`         | none                             | The completing CI run's conclusion. **Omit to reconcile.**    |
+| `run-id`             | none                             | The completing run's id. Logged, for correlation.             |
+| `run-url`            | none                             | The completing run's `html_url`. Becomes `details_url`.       |
+| `check-name`         | `stack-optimization`             | Overrides the config file                                     |
+| `checkpoint-label`   | `stack-checkpoint`               | Overrides the config file                                     |
+| `propagate-failures` | `true`                           | Overrides the config file                                     |
+| `skip-draft-head`    | `true`                           | Overrides the config file                                     |
+| `config-path`        | `.github/stack-optimization.yml` | Read from the default branch                                  |
 
 **Outputs.**
 
-| Output | Meaning |
-|---|---|
-| `plan` | JSON array of `{pr, sha, status, conclusion, reason, title, summary, details_url, provenance}` |
-| `is-authoritative` | `true` when the completing run established a verdict of its own |
-| `affected-count` | Number of entries in the plan. `0` means nothing to do. |
-| `check-name` | The resolved check name, for passing to `propagate` |
+| Output             | Meaning                                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------------------- |
+| `plan`             | JSON array of `{pr, sha, status, conclusion, reason, title, summary, details_url, provenance}` |
+| `is-authoritative` | `true` when the completing run established a verdict of its own                                |
+| `affected-count`   | Number of entries in the plan. `0` means nothing to do.                                        |
+| `check-name`       | The resolved check name, for passing to `propagate`                                            |
 
 Pass `check-name` from this output into `propagate` rather than setting it twice.
 `verdict` reads the config file; `propagate` does not. Threading it through is
@@ -467,37 +467,37 @@ so that computing and writing can be tested, logged, and dry-run independently.
 
 **Inputs.**
 
-| Input | Default | Notes |
-|---|---|---|
-| `token` | `${{ github.token }}` | Needs `checks: write` and `pull-requests: read` |
-| `plan` | **required** | The `plan` output from `verdict` |
-| `check-name` | `stack-optimization` | **Does not read the config file.** Pass `verdict`'s `check-name` output. |
-| `dry-run` | `false` | Log every write without performing it |
-| `max-concurrency` | `4` | Concurrent check-run writes |
+| Input             | Default               | Notes                                                                    |
+| ----------------- | --------------------- | ------------------------------------------------------------------------ |
+| `token`           | `${{ github.token }}` | Needs `checks: write` and `pull-requests: read`                          |
+| `plan`            | **required**          | The `plan` output from `verdict`                                         |
+| `check-name`      | `stack-optimization`  | **Does not read the config file.** Pass `verdict`'s `check-name` output. |
+| `dry-run`         | `false`               | Log every write without performing it                                    |
+| `max-concurrency` | `4`                   | Concurrent check-run writes                                              |
 
 **Outputs.**
 
-| Output | Meaning |
-|---|---|
-| `posted` | Number of check runs written (or that would have been, under `dry-run`) |
-| `skipped-stale` | Number of PRs skipped because their head commit moved mid-flight |
-| `results` | JSON array of per-entry results, including each check run's id |
+| Output          | Meaning                                                                 |
+| --------------- | ----------------------------------------------------------------------- |
+| `posted`        | Number of check runs written (or that would have been, under `dry-run`) |
+| `skipped-stale` | Number of PRs skipped because their head commit moved mid-flight        |
+| `results`       | JSON array of per-entry results, including each check run's id          |
 
 **Behaviour worth knowing.**
 
-*Idempotent writes.* Before writing, `propagate` lists the existing check runs on
+_Idempotent writes._ Before writing, `propagate` lists the existing check runs on
 the target commit under the same name and updates the most recent match rather
 than creating a new one. A stack that re-propagates ten times leaves one check
 run on each parent, not ten.
 
-*The staleness guard.* Before writing to a PR, `propagate` re-fetches that PR's
+_The staleness guard._ Before writing to a PR, `propagate` re-fetches that PR's
 current head commit and compares it against the commit recorded in the plan. If
 they differ, the PR moved while the gate was running, and it is skipped. This
-matters: writing a stale verdict onto a *new* commit would be a correctness bug,
+matters: writing a stale verdict onto a _new_ commit would be a correctness bug,
 because that commit's code was never tested. The skipped PR is picked up by its
 own gate cycle moments later.
 
-*Bounded concurrency.* Writes are capped at `max-concurrency` in flight, and
+_Bounded concurrency._ Writes are capped at `max-concurrency` in flight, and
 rate-limited responses are retried with exponential backoff, honouring GitHub's
 `Retry-After` header. A deep stack will not trip secondary rate limits.
 
@@ -537,22 +537,22 @@ this, so if you use `gate.yml` you do not need `seed`. Reach for it if:
 
 **Inputs.**
 
-| Input | Default | Notes |
-|---|---|---|
-| `token` | `${{ github.token }}` | Needs `checks: write`, `pull-requests: read`, `contents: read` |
-| `context` | resolved internally | Pass `context`'s output to avoid resolving twice |
-| `pr-number` | inferred from the event | |
-| `check-name` | `stack-optimization` | Overrides the config file |
-| `checkpoint-label` | `stack-checkpoint` | Overrides the config file |
-| `skip-draft-head` | `true` | Overrides the config file |
-| `config-path` | `.github/stack-optimization.yml` | Read from the default branch |
+| Input              | Default                          | Notes                                                          |
+| ------------------ | -------------------------------- | -------------------------------------------------------------- |
+| `token`            | `${{ github.token }}`            | Needs `checks: write`, `pull-requests: read`, `contents: read` |
+| `context`          | resolved internally              | Pass `context`'s output to avoid resolving twice               |
+| `pr-number`        | inferred from the event          |                                                                |
+| `check-name`       | `stack-optimization`             | Overrides the config file                                      |
+| `checkpoint-label` | `stack-checkpoint`               | Overrides the config file                                      |
+| `skip-draft-head`  | `true`                           | Overrides the config file                                      |
+| `config-path`      | `.github/stack-optimization.yml` | Read from the default branch                                   |
 
 **Outputs.**
 
-| Output | Meaning |
-|---|---|
-| `check-run-id` | Id of the seeded check run |
-| `state` | What the check was left as: `queued`, `in_progress`, `completed`, or `skipped` |
+| Output         | Meaning                                                                        |
+| -------------- | ------------------------------------------------------------------------------ |
+| `check-run-id` | Id of the seeded check run                                                     |
+| `state`        | What the check was left as: `queued`, `in_progress`, `completed`, or `skipped` |
 
 **Behaviour worth knowing.**
 
@@ -594,36 +594,36 @@ stacks and does not need to.
 
 **Inputs.**
 
-| Input | Default | Notes |
-|---|---|---|
-| `token` | `${{ github.token }}` | Needs `checks: write` |
-| `name` | `stack-optimization` | The check run name. This is the name branch protection requires. |
-| `sha` | **required** | The commit to write to |
-| `status` | `completed` | `queued`, `in_progress`, or `completed` |
-| `conclusion` | none | `success`, `failure`, or `neutral`. Required when `status: completed`. |
-| `title` | the check name | Output title |
-| `summary` | none | Output summary, markdown |
-| `text` | none | Extended output detail, markdown |
-| `details-url` | none | Where the check's "Details" link goes |
-| `external-id` | not written | Your own correlation id. See below. |
+| Input         | Default               | Notes                                                                  |
+| ------------- | --------------------- | ---------------------------------------------------------------------- |
+| `token`       | `${{ github.token }}` | Needs `checks: write`                                                  |
+| `name`        | `stack-optimization`  | The check run name. This is the name branch protection requires.       |
+| `sha`         | **required**          | The commit to write to                                                 |
+| `status`      | `completed`           | `queued`, `in_progress`, or `completed`                                |
+| `conclusion`  | none                  | `success`, `failure`, or `neutral`. Required when `status: completed`. |
+| `title`       | the check name        | Output title                                                           |
+| `summary`     | none                  | Output summary, markdown                                               |
+| `text`        | none                  | Extended output detail, markdown                                       |
+| `details-url` | none                  | Where the check's "Details" link goes                                  |
+| `external-id` | not written           | Your own correlation id. See below.                                    |
 
 **Outputs.**
 
-| Output | Meaning |
-|---|---|
-| `check-run-id` | Id of the check run created or updated |
-| `created` | `false` when an existing check run was updated instead |
+| Output         | Meaning                                                |
+| -------------- | ------------------------------------------------------ |
+| `check-run-id` | Id of the check run created or updated                 |
+| `created`      | `false` when an existing check run was updated instead |
 
 **Behaviour worth knowing.**
 
-*Idempotent on `(name, sha)`.* Calling it repeatedly with the same name and commit
+_Idempotent on `(name, sha)`._ Calling it repeatedly with the same name and commit
 updates one check run rather than accumulating duplicates.
 
-*Input validation happens before any API call.* A `completed` status with no
+_Input validation happens before any API call._ A `completed` status with no
 conclusion, or a conclusion outside the allowed set, fails immediately with a
 message naming the problem rather than producing an opaque API error.
 
-*About `external-id`.* `post-check` never writes the gate's provenance marker —
+_About `external-id`._ `post-check` never writes the gate's provenance marker —
 it is a general-purpose primitive, and stamping a stack-specific marker onto an
 unrelated check would be wrong. If you pass `external-id`, that value is used; if
 you do not, the field is left alone entirely, so a correlation id you set on the
@@ -691,7 +691,7 @@ output into it. `post-check` takes `name`. Everything else reads the file.
 
 ### `always-run-paths` and `force-run-label`
 
-These exist for a specific situation: an *intermediate* state that is genuinely
+These exist for a specific situation: an _intermediate_ state that is genuinely
 dangerous even though the final state is fine. The canonical example is a database
 migration. A stack that adds a migration in `#2` and the code using it in `#4` has
 a real intermediate state — `#2` merged alone — that nobody tested, because only
@@ -844,7 +844,7 @@ on:
 ```
 
 Note that each completion triggers a gate run, and the last one to finish
-determines the final state. If you need the verdict to reflect *all* of them
+determines the final state. If you need the verdict to reflect _all_ of them
 together, aggregate them into one workflow instead.
 
 ### A different check name
@@ -913,12 +913,12 @@ verdict overwrites it.
 Read the check's summary first. It says which case you are in, and there are
 several legitimate ones:
 
-| Summary says | What happened | What to do |
-|---|---|---|
-| `Gated by #N, which has not established a verdict yet` | The authority's CI has not finished, or has not run since the last push | Wait, or check on `#N` |
-| `This PR now owns its own verdict … but the check it carried was inherited` | You just added a checkpoint label. The PR has never run its own CI. | Re-run CI on that PR |
+| Summary says                                                                              | What happened                                                                      | What to do                  |
+| ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------- |
+| `Gated by #N, which has not established a verdict yet`                                    | The authority's CI has not finished, or has not run since the last push            | Wait, or check on `#N`      |
+| `This PR now owns its own verdict … but the check it carried was inherited`               | You just added a checkpoint label. The PR has never run its own CI.                | Re-run CI on that PR        |
 | `This PR is no longer part of a stack, and the check it previously carried was inherited` | The PR left its stack. Its green came from an authority that no longer governs it. | Re-run CI, or push a commit |
-| `The CI run concluded X, which is not a verdict` | The run was cancelled or skipped entirely | Re-run CI |
+| `The CI run concluded X, which is not a verdict`                                          | The run was cancelled or skipped entirely                                          | Re-run CI                   |
 
 In every one of these, the gate is refusing to report a verdict it cannot
 justify. Holding is the deliberate choice: the alternative is reporting a pass
