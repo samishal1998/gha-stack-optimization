@@ -169,6 +169,54 @@ describe('ChecksClient.write', () => {
     expect(calls.update[0]).toMatchObject({ check_run_id: 77 });
   });
 
+  it('withholds with action_required when a completed check cannot be reopened', async () => {
+    // GitHub accepts `status: in_progress` on a completed check run and ignores
+    // it, so a hold expressed that way would silently leave a stale `success`
+    // in place — the one outcome this project exists to prevent.
+    const { octokit, calls } = fakeOctokit({ existing: [run({ id: 42, conclusion: 'success' })] });
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization');
+    await client.write(entry({ status: 'in_progress', conclusion: null, title: 'Waiting' }));
+    expect(calls.update[0]).toMatchObject({
+      check_run_id: 42,
+      status: 'completed',
+      conclusion: 'action_required',
+      output: { title: 'Waiting' },
+    });
+  });
+
+  it('still holds as in_progress when the existing check has not completed', async () => {
+    const { octokit, calls } = fakeOctokit({
+      existing: [run({ id: 42, status: 'in_progress', conclusion: null })],
+    });
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization');
+    await client.write(entry({ status: 'in_progress', conclusion: null }));
+    expect(calls.update[0]).toMatchObject({ status: 'in_progress' });
+    expect(calls.update[0]).not.toHaveProperty('conclusion');
+  });
+
+  it('holds as in_progress when there is no existing check at all', async () => {
+    const { octokit, calls } = fakeOctokit({});
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization');
+    await client.write(entry({ status: 'in_progress', conclusion: null }));
+    expect(calls.create[0]).toMatchObject({ status: 'in_progress' });
+    expect(calls.create[0]).not.toHaveProperty('conclusion');
+  });
+
+  it('keeps hold provenance, so a withheld check is never mirrored', async () => {
+    const { octokit, calls } = fakeOctokit({ existing: [run({ id: 42, conclusion: 'success' })] });
+    const client = new ChecksClient(octokit, REPO, 'stack-optimization');
+    await client.write(
+      entry({
+        status: 'in_progress',
+        conclusion: null,
+        provenance: provenance({ src: 'hold' }),
+      }),
+    );
+    expect(decodeProvenance((calls.update[0] as { external_id: string }).external_id)?.src).toBe(
+      'hold',
+    );
+  });
+
   it('omits conclusion when holding a check in progress', async () => {
     const { octokit, calls } = fakeOctokit({});
     const client = new ChecksClient(octokit, REPO, 'stack-optimization');

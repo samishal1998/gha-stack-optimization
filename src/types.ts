@@ -72,8 +72,16 @@ export type RunConclusion =
   | 'stale'
   | 'skipped';
 
-/** Conclusions the gate is willing to write. */
-export type GateConclusion = 'success' | 'failure' | 'neutral';
+/**
+ * Conclusions the gate is willing to write.
+ *
+ * `action_required` is the escape hatch for withholding approval on a check that
+ * has already completed. GitHub will not walk a completed check run back to
+ * `in_progress` — the PATCH returns 200 and is silently ignored — so a hold that
+ * lands on a completed check has to be expressed as a conclusion or it does
+ * nothing at all.
+ */
+export type GateConclusion = 'success' | 'failure' | 'neutral' | 'action_required';
 
 export type CheckStatus = 'queued' | 'in_progress' | 'completed';
 

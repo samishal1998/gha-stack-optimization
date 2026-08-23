@@ -91,22 +91,42 @@ export class ChecksClient {
    */
   async write(entry: PlanEntry, text?: string): Promise<{ id: number; created: boolean }> {
     const existing = await this.read(entry.sha);
+
+    // A hold cannot be expressed as `in_progress` once the check has completed:
+    // GitHub accepts the PATCH and ignores it, leaving whatever conclusion was
+    // there — usually `success`. Silently keeping a green the gate has just
+    // decided not to trust is the worst outcome available, so the hold becomes
+    // `action_required`, which withholds approval and reads as "you need to do
+    // something" rather than "this failed". Provenance stays `hold`, so it is
+    // never mistaken for an earned verdict.
+    const held = entry.status !== 'completed' && existing?.status === 'completed';
+    const effective: PlanEntry = held
+      ? { ...entry, status: 'completed', conclusion: 'action_required' }
+      : entry;
+    if (held) {
+      core.info(
+        `#${entry.pr} ${entry.sha.slice(0, 7)}: cannot reopen a completed check, ` +
+          'withholding with action_required instead of in_progress.',
+      );
+    }
+
+    const entryToWrite = effective;
     const externalId =
-      this.externalId === undefined ? encodeProvenance(entry.provenance) : this.externalId;
+      this.externalId === undefined ? encodeProvenance(entryToWrite.provenance) : this.externalId;
     const body = {
       ...this.repo,
       name: this.checkName,
-      status: entry.status,
+      status: entryToWrite.status,
       // Omitted rather than nulled: a PATCH leaves an unspecified field alone,
       // so a standalone caller's correlation id survives an update.
       ...(externalId === null ? {} : { external_id: externalId }),
       output: {
-        title: entry.title,
-        summary: entry.summary,
+        title: entryToWrite.title,
+        summary: entryToWrite.summary,
         ...(text ? { text } : {}),
       },
-      ...(entry.conclusion ? { conclusion: entry.conclusion } : {}),
-      ...(entry.details_url ? { details_url: entry.details_url } : {}),
+      ...(entryToWrite.conclusion ? { conclusion: entryToWrite.conclusion } : {}),
+      ...(entryToWrite.details_url ? { details_url: entryToWrite.details_url } : {}),
     };
 
     if (existing) {
@@ -119,14 +139,17 @@ export class ChecksClient {
       } catch (err) {
         if (!isForbidden(err)) throw err;
         core.warning(
-          `Cannot update check run ${existing.id} on ${entry.sha.slice(0, 7)} — it belongs to a ` +
+          `Cannot update check run ${existing.id} on ${entryToWrite.sha.slice(0, 7)} — it belongs to a ` +
             'different app identity. Creating a new one. If you changed the `token` input, expect ' +
             'one stale duplicate check until the next push.',
         );
       }
     }
 
-    const { data } = await this.octokit.rest.checks.create({ ...body, head_sha: entry.sha });
+    const { data } = await this.octokit.rest.checks.create({
+      ...body,
+      head_sha: entryToWrite.sha,
+    });
     return { id: data.id, created: true };
   }
 }
