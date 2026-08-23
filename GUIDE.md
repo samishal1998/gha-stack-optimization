@@ -783,9 +783,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: stack-optimization
+  group: >-
+    stack-optimization-${{ github.event.workflow_run.head_branch
+    || github.event.pull_request.head.ref
+    || github.ref }}
   cancel-in-progress: false
-  queue: max
 
 jobs:
   gate:
@@ -819,7 +821,8 @@ jobs:
 Three details to keep if you write your own: pass `context` into `verdict` so both
 see the same topology; pass `verdict`'s `check-name` into `propagate` so a
 config-file name is not ignored; and keep the `concurrency` block, including
-`queue: max`.
+the `concurrency` block, whose grouping is explained in the
+[README](README.md#2-add-the-gate-workflow).
 
 ### More than one CI workflow
 
