@@ -89,6 +89,22 @@ function shortSha(sha: string | null): string {
   return sha ? sha.slice(0, 7) : 'unknown';
 }
 
+/**
+ * A markdown link to the run that established a verdict, for the summary.
+ *
+ * `details_url` would be the natural place for this, but GitHub silently
+ * discards that field on check runs created by the built-in `github-actions`
+ * app and substitutes the check run's own page. Verified directly against the
+ * API: an explicit `https://example.com/...` comes back rewritten. So the link
+ * goes in the summary, which GitHub leaves alone.
+ *
+ * The URL comes from the `workflow_run` payload, not from anything a pull
+ * request can influence.
+ */
+function runLink(label: string, url: string | null): string {
+  return url ? ` [${label}](${url})` : '';
+}
+
 const ROLE_WORD: Record<AuthorityRole, string> = {
   head: 'stack head',
   checkpoint: 'checkpoint',
@@ -176,7 +192,9 @@ function propagateAcrossSegment(
         conclusion: verdict,
         reason: selfReason,
         title: `CI ${VERDICT_WORD[verdict]}`,
-        summary: `This PR is the ${role} of its segment and ran the real CI suite. ${governs}`,
+        summary:
+          `This PR is the ${role} of its segment and ran the real CI suite. ${governs}` +
+          runLink('View the run', detailsUrl),
         detailsUrl,
         provenance: ownCiProvenance(forced, authorityPr, authoritySha),
       });
@@ -207,7 +225,8 @@ function propagateAcrossSegment(
       summary:
         `Gated by #${authorityPr} (${role}). CI was not run on this PR: ` +
         `#${authorityPr}'s tree contains every change in this one, so its verdict applies here. ` +
-        `Authority commit \`${shortSha(authoritySha)}\`.`,
+        `Authority commit \`${shortSha(authoritySha)}\`.` +
+        runLink(`View #${authorityPr}'s CI run`, detailsUrl),
       detailsUrl,
       provenance: mirrorProvenance(authorityPr, authoritySha),
     });
@@ -465,7 +484,8 @@ export function computeVerdict(input: VerdictInput): VerdictPlan {
           summary:
             `Gated by #${authorityPr} (${authorityRole(ctx)}). ` +
             `CI was not run on this PR: #${authorityPr}'s tree contains every change in this one, ` +
-            `so its verdict applies here. Authority commit \`${shortSha(ctx.authoritySha)}\`.`,
+            `so its verdict applies here. Authority commit \`${shortSha(ctx.authoritySha)}\`.` +
+            runLink(`View #${authorityPr}'s CI run`, authorityCheck?.detailsUrl ?? null),
           detailsUrl: authorityCheck?.detailsUrl ?? null,
           provenance: mirrorProvenance(authorityPr, ctx.authoritySha),
         }),

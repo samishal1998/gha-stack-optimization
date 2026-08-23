@@ -29668,6 +29668,9 @@ function isEstablishedVerdict(check) {
 function shortSha(sha) {
   return sha ? sha.slice(0, 7) : "unknown";
 }
+function runLink(label, url) {
+  return url ? ` [${label}](${url})` : "";
+}
 var ROLE_WORD = {
   head: "stack head",
   checkpoint: "checkpoint",
@@ -29717,7 +29720,7 @@ function propagateAcrossSegment(ctx, segment, verdict, detailsUrl, config, selfR
         conclusion: verdict,
         reason: selfReason,
         title: `CI ${VERDICT_WORD[verdict]}`,
-        summary: `This PR is the ${role} of its segment and ran the real CI suite. ${governs}`,
+        summary: `This PR is the ${role} of its segment and ran the real CI suite. ${governs}` + runLink("View the run", detailsUrl),
         detailsUrl,
         provenance: ownCiProvenance(forced, authorityPr, authoritySha)
       });
@@ -29740,7 +29743,7 @@ function propagateAcrossSegment(ctx, segment, verdict, detailsUrl, config, selfR
       conclusion: verdict,
       reason: "mirrors-authority",
       title: `Mirrors #${authorityPr} (${VERDICT_WORD[verdict]})`,
-      summary: `Gated by #${authorityPr} (${role}). CI was not run on this PR: #${authorityPr}'s tree contains every change in this one, so its verdict applies here. Authority commit \`${shortSha(authoritySha)}\`.`,
+      summary: `Gated by #${authorityPr} (${role}). CI was not run on this PR: #${authorityPr}'s tree contains every change in this one, so its verdict applies here. Authority commit \`${shortSha(authoritySha)}\`.` + runLink(`View #${authorityPr}'s CI run`, detailsUrl),
       detailsUrl,
       provenance: mirrorProvenance(authorityPr, authoritySha)
     });
@@ -29919,7 +29922,7 @@ function computeVerdict(input) {
           conclusion: verdict,
           reason: "mirrors-authority",
           title: `Mirrors #${authorityPr} (${VERDICT_WORD[verdict]})`,
-          summary: `Gated by #${authorityPr} (${authorityRole(ctx)}). CI was not run on this PR: #${authorityPr}'s tree contains every change in this one, so its verdict applies here. Authority commit \`${shortSha(ctx.authoritySha)}\`.`,
+          summary: `Gated by #${authorityPr} (${authorityRole(ctx)}). CI was not run on this PR: #${authorityPr}'s tree contains every change in this one, so its verdict applies here. Authority commit \`${shortSha(ctx.authoritySha)}\`.` + runLink(`View #${authorityPr}'s CI run`, authorityCheck?.detailsUrl ?? null),
           detailsUrl: authorityCheck?.detailsUrl ?? null,
           provenance: mirrorProvenance(authorityPr, ctx.authoritySha)
         })
