@@ -27667,11 +27667,37 @@ function setContextOutputs(ctx) {
   setOutput("stack", JSON.stringify(ctx.stack));
   setOutput("context", JSON.stringify(ctx));
 }
+function setEmptyContextOutputs() {
+  for (const name of ["in-stack", "is-head", "is-root", "is-checkpoint", "is-authority"]) {
+    setOutput(name, "false");
+  }
+  for (const name of [
+    "stack-id",
+    "target-branch",
+    "position",
+    "sha",
+    "authority-pr",
+    "authority-sha",
+    "authority-role",
+    "context"
+  ]) {
+    setOutput(name, "");
+  }
+  setOutput("size", "0");
+  for (const name of ["segment", "ancestors", "descendants", "stack"]) {
+    setOutput(name, "[]");
+  }
+}
 
 // src/entrypoints/context.ts
 async function main() {
   const resolved = await resolve();
   if (!resolved) {
+    if (workflowRunPayload()) {
+      info("No pull request is associated with this run; nothing to gate.");
+      setEmptyContextOutputs();
+      return;
+    }
     throw new Error(
       "Could not determine which pull request to resolve. Pass the `pr-number` input."
     );

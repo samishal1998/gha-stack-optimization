@@ -97,6 +97,35 @@ export function setContextOutputs(ctx: StackContext): void {
   core.setOutput('context', JSON.stringify(ctx));
 }
 
+/**
+ * Emit the shape of a context for "there is no pull request here".
+ *
+ * A `workflow_run` completion for a push to a branch with no PR is a normal,
+ * frequent event — every push to the default branch produces one. Downstream
+ * steps read `in-stack: false` and an empty `context`, and the gate does nothing.
+ */
+export function setEmptyContextOutputs(): void {
+  for (const name of ['in-stack', 'is-head', 'is-root', 'is-checkpoint', 'is-authority']) {
+    core.setOutput(name, 'false');
+  }
+  for (const name of [
+    'stack-id',
+    'target-branch',
+    'position',
+    'sha',
+    'authority-pr',
+    'authority-sha',
+    'authority-role',
+    'context',
+  ]) {
+    core.setOutput(name, '');
+  }
+  core.setOutput('size', '0');
+  for (const name of ['segment', 'ancestors', 'descendants', 'stack']) {
+    core.setOutput(name, '[]');
+  }
+}
+
 /** Parse a context passed between actions, falling back to a fresh resolve. */
 export function parseContextInput(raw: string): StackContext | null {
   if (!raw.trim()) return null;
