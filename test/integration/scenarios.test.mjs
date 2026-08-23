@@ -246,7 +246,9 @@ scenario('7. A PR that left its stack does not keep its inherited green');
   check('it is held, not passed', [plan[0].status, plan[0].conclusion], ['in_progress', null]);
   check('with the reason recorded', plan[0].reason, 'left-stack-needs-own-ci');
   truthy('and instructions in the summary', plan[0].summary.includes('Re-run the CI workflow'));
-  check('the check was rewritten', checkOn(mock.state, 'sha1')?.status, 'in_progress');
+  // The plan says hold; the write turns that into action_required because the
+  // existing check had already completed and GitHub will not reopen it.
+  check('the check actually withholds', checkOn(mock.state, 'sha1')?.conclusion, 'action_required');
   await mock.close();
 }
 
@@ -276,8 +278,8 @@ scenario('8. Promoting a PR to checkpoint invalidates its inherited check');
     [2, 1],
   );
   check('it is asked to run its own CI', plan[0].reason, 'authority-needs-own-ci');
-  check('#2 no longer green', checkOn(mock.state, 'sha2')?.conclusion, null);
-  check('#1 no longer green either', checkOn(mock.state, 'sha1')?.conclusion, null);
+  check('#2 no longer green', checkOn(mock.state, 'sha2')?.conclusion, 'action_required');
+  check('#1 no longer green either', checkOn(mock.state, 'sha1')?.conclusion, 'action_required');
   await mock.close();
 }
 
@@ -561,6 +563,76 @@ scenario('18. post-check is idempotent and falls back when it cannot update');
   });
   check('falls back to creating', [c.failed, c.outputs.created], [false, 'true']);
   await denied.close();
+}
+
+// ===========================================================================
+scenario('19. A hold actually withholds, even on a check that already passed');
+{
+  // GitHub ignores `status: in_progress` on a completed check run. Before this
+  // was handled, every invalidation path silently left a green check in place.
+  const mock = await startMockGitHub(stackOf(3));
+  await gate(mock, { pr: 3, conclusion: 'success' });
+  check('#1 starts green', checkOn(mock.state, 'sha1')?.conclusion, 'success');
+
+  // #2 is promoted to checkpoint: its inherited check must stop counting.
+  mock.state.prs.find((p) => p.number === 2).labels = ['stack-checkpoint'];
+  await gate(mock, { pr: 2, conclusion: undefined });
+
+  const two = checkOn(mock.state, 'sha2');
+  check('#2 no longer passes', two?.conclusion, 'action_required');
+  check('and it is not left as success', two?.conclusion === 'success', false);
+  truthy('its summary explains what to do', two?.output?.summary?.includes('Re-run the CI'));
+  check('provenance stays a hold', provenanceOf(two)?.src, 'hold');
+  check('#1 is withheld too', checkOn(mock.state, 'sha1')?.conclusion, 'action_required');
+  console.log('      → a required check in this state blocks the merge, as intended');
+  await mock.close();
+}
+
+// ===========================================================================
+scenario('20. A PR that left its stack is actually withheld, not just relabelled');
+{
+  const mock = await startMockGitHub({
+    prs: [{ number: 1, sha: 'sha1' }],
+    stack: null,
+    configYml: null,
+    checkRuns: [
+      {
+        id: 1,
+        name: CHECK,
+        head_sha: 'sha1',
+        status: 'completed',
+        conclusion: 'success',
+        external_id:
+          'stack-optimization:' +
+          JSON.stringify({ v: 1, src: 'mirror', auth: 3, authSha: 'sha3', forced: false }),
+        details_url: null,
+        started_at: '2026-08-01T00:00:00Z',
+      },
+    ],
+  });
+  await gate(mock, { pr: 1, conclusion: undefined });
+  const one = checkOn(mock.state, 'sha1');
+  check('the inherited green is gone', one?.conclusion, 'action_required');
+  truthy('with instructions', one?.output?.summary?.includes('Re-run the CI workflow'));
+  await mock.close();
+}
+
+// ===========================================================================
+scenario('21. A real verdict clears a withheld check');
+{
+  const mock = await startMockGitHub(stackOf(3));
+  await gate(mock, { pr: 3, conclusion: 'success' });
+  mock.state.prs.find((p) => p.number === 2).labels = ['stack-checkpoint'];
+  await gate(mock, { pr: 2, conclusion: undefined });
+  check('withheld', checkOn(mock.state, 'sha2')?.conclusion, 'action_required');
+
+  // #2 now runs its own CI as the checkpoint it has become.
+  await gate(mock, { pr: 2, conclusion: 'success' });
+  check('#2 green again', checkOn(mock.state, 'sha2')?.conclusion, 'success');
+  check('and it earned it', provenanceOf(checkOn(mock.state, 'sha2'))?.src, 'own-ci');
+  check('#1 follows its new authority', checkOn(mock.state, 'sha1')?.conclusion, 'success');
+  check('mirroring #2, not #3', provenanceOf(checkOn(mock.state, 'sha1'))?.auth, 2);
+  await mock.close();
 }
 
 // ===========================================================================

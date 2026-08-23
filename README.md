@@ -280,15 +280,29 @@ people wiring the pieces up themselves.
 
 ## The check run contract
 
-| State   | `status`      | `conclusion` | Meaning                                                               |
-| ------- | ------------- | ------------ | --------------------------------------------------------------------- |
-| Seeded  | `queued`      | —            | Written by `seed`, on a PR that owns its own verdict                  |
-| Waiting | `in_progress` | —            | Authority identified; its CI is running, or it needs a run of its own |
-| Pass    | `completed`   | `success`    | The authority passed                                                  |
-| Fail    | `completed`   | `failure`    | The authority failed                                                  |
+| State    | `status`      | `conclusion`      | Meaning                                                               |
+| -------- | ------------- | ----------------- | --------------------------------------------------------------------- |
+| Seeded   | `queued`      | —                 | Written by `seed`, on a PR that owns its own verdict                  |
+| Waiting  | `in_progress` | —                 | Authority identified; its CI is running, or it needs a run of its own |
+| Pass     | `completed`   | `success`         | The authority passed                                                  |
+| Fail     | `completed`   | `failure`         | The authority failed                                                  |
+| Withheld | `completed`   | `action_required` | A verdict was withdrawn; only you can restore it                      |
 
 A check is **always** present on every open PR's head commit. A missing check is
 the one state that hard-blocks a merge with no recourse, so it must never happen.
+
+**About the withheld state.** When the gate decides a check can no longer be
+trusted — a PR was promoted to checkpoint, or left its stack, so the green it was
+carrying was earned by someone else — it wants to put that check back to
+`in_progress`. GitHub does not allow it: a `PATCH` moving a completed check run to
+a non-terminal status returns `200` and is silently ignored, leaving the old
+conclusion in place. So the gate writes `action_required` instead, the only
+conclusion that withholds approval. It reads as "you need to do something" rather
+than "this failed", the summary says exactly what, and the next real verdict
+clears it.
+
+Without this, every invalidation would be cosmetic: the check would go on saying
+`success` while the gate had already decided it should not.
 
 When a PR's head commit changes, the new commit **does not inherit** the old
 commit's verdict. It starts in a non-verdict state: `queued` if `seed` runs and the
@@ -315,11 +329,11 @@ re-deriving the verdict from the checks already on record. No CI is re-dispatche
 
 | What changed                                                                      | What the gate does                                                                                                                                                                                                                                                                    |
 | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Checkpoint label added                                                            | The promoted PR is now an authority but has never run its own CI. Its inherited check is invalidated and its segment holds at `in_progress` until it runs.                                                                                                                            |
+| Checkpoint label added                                                            | The promoted PR is now an authority but has never run its own CI. Its inherited check is withdrawn (`action_required`) and its segment withheld until it runs.                                                                                                                        |
 | Checkpoint label removed                                                          | The PR rejoins the segment above and mirrors it again.                                                                                                                                                                                                                                |
 | Head merged or closed                                                             | The next PR down becomes the head. It is now an authority, but the check it was carrying was mirrored from the PR that just merged, so the gate will not honour it — that PR and everything below it hold at `in_progress` until it runs its own CI. See [Limitations](#limitations). |
 | Draft flipped to ready, or to draft                                               | Segment boundaries move (see [`skip-draft-head`](GUIDE.md#skip-draft-head)) and verdicts are re-derived.                                                                                                                                                                              |
-| PR removed from the stack                                                         | Its inherited green no longer applies. The check holds at `in_progress` with instructions to re-run CI.                                                                                                                                                                               |
+| PR removed from the stack                                                         | Its inherited green no longer applies, so the check is withdrawn (`action_required`) with instructions to re-run CI.                                                                                                                                                                  |
 | Parent receives a direct push                                                     | The new commit gets an `in_progress` check naming its authority, or immediately re-mirrors that authority's verdict if one is already established. Its own CI still does not run.                                                                                                     |
 | **How the gate knows an earned green from an inherited one.** Every check it      |
 | writes records its provenance in the check run's `external_id`: whether the       |

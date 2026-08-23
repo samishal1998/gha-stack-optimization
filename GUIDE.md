@@ -889,6 +889,18 @@ repository full of blocked pull requests.
 
 ## Troubleshooting
 
+### A PR's check says `action_required`
+
+The gate withdrew a verdict it decided not to trust, and only you can restore it.
+This is not a failure — the summary says which case it is, and the answer is
+usually to re-run CI on that PR.
+
+It appears as a conclusion rather than a pending state because GitHub will not
+move a completed check run back to `in_progress`; that `PATCH` is accepted and
+ignored. `action_required` is the only conclusion that withholds approval, so it
+is what the gate uses when a completed check has to stop counting. The next real
+verdict overwrites it.
+
 ### A PR's check is stuck at `in_progress`
 
 Read the check's summary first. It says which case you are in, and there are

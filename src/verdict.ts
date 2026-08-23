@@ -68,7 +68,14 @@ export function toGateConclusion(c: RunConclusion | null): GateConclusion | null
   }
 }
 
-const SEVERITY: Record<GateConclusion, number> = { success: 0, neutral: 1, failure: 2 };
+// `action_required` outranks a failure: it means a human has to act before this
+// check means anything, so it must never be folded away by a worse-of.
+const SEVERITY: Record<GateConclusion, number> = {
+  success: 0,
+  neutral: 1,
+  failure: 2,
+  action_required: 3,
+};
 
 /** Failure dominates. Used to fold a forced run's own result into its verdict. */
 export function worstOf(a: GateConclusion, b: GateConclusion): GateConclusion {
@@ -157,6 +164,7 @@ const VERDICT_WORD: Record<GateConclusion, string> = {
   success: 'passed',
   neutral: 'was neutral',
   failure: 'failed',
+  action_required: 'needs attention',
 };
 
 /**

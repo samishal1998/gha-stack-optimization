@@ -20180,21 +20180,29 @@ var ChecksClient = class {
    */
   async write(entry2, text) {
     const existing = await this.read(entry2.sha);
-    const externalId = this.externalId === void 0 ? encodeProvenance(entry2.provenance) : this.externalId;
+    const held = entry2.status !== "completed" && existing?.status === "completed";
+    const effective = held ? { ...entry2, status: "completed", conclusion: "action_required" } : entry2;
+    if (held) {
+      info(
+        `#${entry2.pr} ${entry2.sha.slice(0, 7)}: cannot reopen a completed check, withholding with action_required instead of in_progress.`
+      );
+    }
+    const entryToWrite = effective;
+    const externalId = this.externalId === void 0 ? encodeProvenance(entryToWrite.provenance) : this.externalId;
     const body = {
       ...this.repo,
       name: this.checkName,
-      status: entry2.status,
+      status: entryToWrite.status,
       // Omitted rather than nulled: a PATCH leaves an unspecified field alone,
       // so a standalone caller's correlation id survives an update.
       ...externalId === null ? {} : { external_id: externalId },
       output: {
-        title: entry2.title,
-        summary: entry2.summary,
+        title: entryToWrite.title,
+        summary: entryToWrite.summary,
         ...text ? { text } : {}
       },
-      ...entry2.conclusion ? { conclusion: entry2.conclusion } : {},
-      ...entry2.details_url ? { details_url: entry2.details_url } : {}
+      ...entryToWrite.conclusion ? { conclusion: entryToWrite.conclusion } : {},
+      ...entryToWrite.details_url ? { details_url: entryToWrite.details_url } : {}
     };
     if (existing) {
       try {
@@ -20206,11 +20214,14 @@ var ChecksClient = class {
       } catch (err) {
         if (!isForbidden(err)) throw err;
         warning(
-          `Cannot update check run ${existing.id} on ${entry2.sha.slice(0, 7)} \u2014 it belongs to a different app identity. Creating a new one. If you changed the \`token\` input, expect one stale duplicate check until the next push.`
+          `Cannot update check run ${existing.id} on ${entryToWrite.sha.slice(0, 7)} \u2014 it belongs to a different app identity. Creating a new one. If you changed the \`token\` input, expect one stale duplicate check until the next push.`
         );
       }
     }
-    const { data } = await this.octokit.rest.checks.create({ ...body, head_sha: entry2.sha });
+    const { data } = await this.octokit.rest.checks.create({
+      ...body,
+      head_sha: entryToWrite.sha
+    });
     return { id: data.id, created: true };
   }
 };
@@ -29658,7 +29669,12 @@ function toGateConclusion(c) {
       return null;
   }
 }
-var SEVERITY = { success: 0, neutral: 1, failure: 2 };
+var SEVERITY = {
+  success: 0,
+  neutral: 1,
+  failure: 2,
+  action_required: 3
+};
 function worstOf(a, b) {
   return SEVERITY[a] >= SEVERITY[b] ? a : b;
 }
@@ -29704,7 +29720,8 @@ function entry(init) {
 var VERDICT_WORD = {
   success: "passed",
   neutral: "was neutral",
-  failure: "failed"
+  failure: "failed",
+  action_required: "needs attention"
 };
 function propagateAcrossSegment(ctx, segment, verdict, detailsUrl, config, selfReason, forced) {
   const authorityPr = ctx.pr;

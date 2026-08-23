@@ -140,9 +140,13 @@ export function startMockGitHub(world) {
         if (world.forbidUpdate) {
           return json(res, 403, { message: 'Resource not accessible by integration' });
         }
+        // GitHub will not walk a completed check run back to a non-terminal
+        // status: the PATCH succeeds and the status is left alone. Reproduced
+        // here, verified against the live API.
+        const reopening = run.status === 'completed' && body.status !== 'completed';
         Object.assign(run, {
-          status: body.status,
-          conclusion: body.conclusion ?? null,
+          status: reopening ? 'completed' : body.status,
+          conclusion: reopening ? run.conclusion : (body.conclusion ?? null),
           external_id: body.external_id ?? run.external_id,
           details_url: body.details_url ?? null,
           output: body.output ?? run.output,
