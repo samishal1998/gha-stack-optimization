@@ -1,0 +1,34 @@
+# .github/stack-optimization.yml
+#
+# Optional. Delete every line you are not changing — these are the defaults.
+# Read from the DEFAULT BRANCH, never from the PR under evaluation, so a fork PR
+# cannot reconfigure the gate that judges it.
+#
+# Precedence: action input > this file > built-in default. If you set a value
+# here, leave the matching input on the reusable workflow unset.
+
+# The check name branch protection requires.
+check-name: stack-optimization
+
+# Marks a PR as a checkpoint: an authority that owns its own verdict, and the
+# boundary that makes a partial merge sound.
+checkpoint-label: stack-checkpoint
+
+# Forces a full CI run on one PR regardless of its stack position.
+force-run-label: stack-ci-force
+
+# A PR touching any of these runs its own CI wherever it sits in the stack —
+# for states that are dangerous in the middle even when the final state is fine.
+# A forced FAILURE is honoured; a forced pass is not, because a skipped workflow
+# also concludes success but never fails.
+always-run-paths: []
+#   - 'migrations/**'
+#   - '**/*.sql'
+
+# Report failure on mirroring PRs, or hold them instead. Holding is quieter and
+# hides real breakage.
+propagate-failures: true
+
+# When the head is a draft, also treat the highest non-draft PR as an authority,
+# so a work-in-progress head cannot paint the mergeable part of the stack red.
+skip-draft-head: true
